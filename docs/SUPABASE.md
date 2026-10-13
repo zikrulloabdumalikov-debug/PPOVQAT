@@ -72,11 +72,18 @@ node --env-file=.env scripts/set-webhook.mjs --info   # holatni tekshirish
 
 Orqaga qaytish: Apps Script muharririda `setWebhook()` ni ishga tushirsangiz, bot yana eski tizimga ulanadi.
 
-## 4. Mini App
+## 4. Mini App'ni yangi backend'ga o'tkazish
 
 `frontend/config.js` dagi `API_URL` yangi funksiyaga qaratilgan
-(`…/functions/v1/api?forceFunctionRegion=ap-southeast-2` — funksiya baza bilan bir regionda ishlaydi).
-`main` ga push qilinsa, GitHub Pages yangilanadi. Repo Variables'da `API_URL` bo'lsa, u ustun turadi.
+(`https://ewxrdloawszmxyojlzdh.supabase.co/functions/v1/api?forceFunctionRegion=ap-southeast-2` —
+funksiya baza bilan bir regionda ishlaydi). Ammo `pages.yml` repo *Variables* dagi `API_URL` ni ustun qo'yadi,
+shuning uchun hozir jonli Mini App hali Apps Script'ga ulangan.
+
+O'tish (1–3-qadamlardan keyin): GitHub → *Settings → Secrets and variables → Actions → Variables* →
+`API_URL` ni yuqoridagi manzilga o'zgartiring (yoki o'chiring) → *Actions → Mini App (GitHub Pages) → Run workflow*.
+Orqaga qaytish: `API_URL` ni eski Apps Script `/exec` manziliga qaytaring va workflow'ni qayta ishga tushiring.
+
+Webhook (3-qadam) va Mini App (4-qadam) birga o'tkazilsin: aks holda bot bir bazaga, ilova boshqasiga yozadi.
 
 ## 5. Telegram'da sinash (tartib bilan)
 
