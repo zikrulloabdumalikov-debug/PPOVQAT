@@ -3,13 +3,15 @@
 Excel o'rniga bitta tizim: mijoz o'zi buyurtma beradi, yetkazuvchi manzil bo'yicha ishlaydi,
 sheriklar foyda-zararni real vaqtda ko'radi. TZ: *"Soglom Ovqatlar — web ilova texnik topshirig'i"*.
 
-**Stek (TZ 3-bo'lim):** Telegram Mini App (HTML/JS) + Google Apps Script (server) + Google Sheets (baza).
-Xarita — Leaflet + OpenStreetMap, grafiklar — Chart.js, bildirishnoma — Telegram bot.
+**Stek:** Telegram Mini App (HTML/JS) + **Supabase** (Postgres + Edge Functions, TypeScript/Deno).
+Avvalgi Apps Script + Google Sheets backend `backend/` da saqlangan (zaxira yo'l).
+Supabase'ga o'rnatish, deploy va Telegram'da sinash: **[docs/SUPABASE.md](docs/SUPABASE.md)**.
 
 ```
-backend/    Apps Script kodi (.gs) — barcha hisob-kitob va ruxsat tekshiruvi shu yerda
+supabase/   Edge Functions, biznes mantiq, migratsiyalar (asosiy backend)
+backend/    Apps Script kodi (.gs) — avvalgi backend, o'chirilmagan
 frontend/   Mini App (statik sayt): mijoz, admin panel, kuryer ekrani — bitta ilova, rolga qarab ochiladi
-test/       Qabul mezonlari (TZ 12) va biznes qoidalar testlari, Apps Script muhiti nusxasi
+test/       Qabul mezonlari (TZ 12) va biznes qoidalar: test/supabase (Postgres) va Apps Script nusxasi
 dev/        Lokal dev server (Telegramsiz sinash)
 docs/       TZ bo'yicha bajarilish jadvali
 ```
@@ -17,7 +19,7 @@ docs/       TZ bo'yicha bajarilish jadvali
 ## Tez boshlash (lokal)
 
 ```bash
-npm test        # 33 ta test: TZ 12-bo'limdagi 12 mezon + biznes qoidalar
+npm test        # Supabase (34) + Apps Script (33) testlari: TZ 12-bo'limdagi 12 mezon + biznes qoidalar
 npm run dev     # http://localhost:8080 — foydalanuvchini tanlab kirasiz (sherik, operator, kuryer, mijoz, yangi)
 ```
 
@@ -25,7 +27,7 @@ Dev server backend kodini o'zgarishsiz, xotiradagi Sheets nusxasida ishlatadi va
 bilan to'ldiradi. Telegram imzosi baribir tekshiriladi (dev tokeni bilan). Pastdagi 🧪 panel: foydalanuvchini
 almashtirish, 📱 botga kontakt yuborish (ro'yxatdan o'tish uchun), 💬 bot yuborgan xabarlar.
 
-## O'rnatish (ishlab chiqarish)
+## O'rnatish: Apps Script varianti (avvalgi)
 
 1. **Bot.** @BotFather → `/newbot` → tokenni oling.
 2. **Baza.** Biznesning umumiy Google akkauntida (kamida ikki sherik egalik bilan, TZ 11.4) yangi Google Sheets yarating.

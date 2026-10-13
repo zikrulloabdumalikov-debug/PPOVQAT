@@ -2,10 +2,19 @@
   "name": "soglom-ovqatlar",
   "version": "1.0.0",
   "private": true,
-  "description": "Sog'lom Ovqatlar: Telegram Mini App + Google Apps Script + Google Sheets",
+  "description": "Sog'lom Ovqatlar: Telegram Mini App + Supabase (Edge Functions, Postgres)",
   "scripts": {
-    "test": "node --test test/*.test.js",
-    "dev": "node dev/server.js"
+    "test": "npm run test:supabase && npm run test:gas",
+    "test:supabase": "node scripts/build-logic.mjs --check && node test/supabase/run.mjs",
+    "test:gas": "node --test test/*.test.js",
+    "build:logic": "node scripts/build-logic.mjs",
+    "dev": "node dev/server.js",
+    "set-webhook": "node --env-file=.env scripts/set-webhook.mjs"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "postgres": "3.4.5"
+  }
 }

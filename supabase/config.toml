@@ -1,0 +1,12 @@
+# Supabase CLI sozlamasi (faqat Edge Functions qismi).
+# Kirish Telegram initData / webhook secret / cron secret bilan tekshiriladi, shuning uchun JWT talab qilinmaydi.
+project_id = "ewxrdloawszmxyojlzdh"
+
+[functions.api]
+verify_jwt = false
+
+[functions.telegram-webhook]
+verify_jwt = false
+
+[functions.cron]
+verify_jwt = false

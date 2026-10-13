@@ -19,12 +19,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: API manzilini yozish
+      - name: API manzilini yozish (ixtiyoriy)
         env:
           API_URL: ${{ vars.API_URL }}
         run: |
-          if [ -z "$API_URL" ]; then echo "Repo Variables da API_URL yo'q"; exit 1; fi
-          printf "window.APP_CONFIG = { API_URL: '%s', DEV: false };\n" "$API_URL" > frontend/config.js
+          # Repo Variables da API_URL bo'lsa — u ishlatiladi, aks holda frontend/config.js dagi manzil qoladi
+          if [ -n "$API_URL" ]; then
+            printf "window.APP_CONFIG = { API_URL: '%s', DEV: false };\n" "$API_URL" > frontend/config.js
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
