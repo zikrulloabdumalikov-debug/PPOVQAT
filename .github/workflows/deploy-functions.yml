@@ -6,6 +6,14 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: ewxrdloawszmxyojlzdh
@@ -17,6 +25,8 @@ jobs:
       - run: npm ci
       - name: Testlar (deploydan oldin)
         run: npm test
+        env:
+          SOGLOM_PG_URL: postgres://postgres:postgres@localhost:5432/
       - uses: supabase/setup-cli@v1
         with:
           version: latest

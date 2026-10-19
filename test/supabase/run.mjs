@@ -6,6 +6,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, chmodSync } from 'node:
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import postgres from 'postgres';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PORT = process.env.SOGLOM_PG_PORT || '54329';
@@ -16,8 +17,11 @@ const asPg = (cmd, args) => {
   if (r.status !== 0) throw new Error(cmd + ' xato: ' + r.stderr + r.stdout);
   return r.stdout;
 };
+// istalgan o'rnatilgan Postgres versiyasini topadi (eng yangisi birinchi)
 const findBin = (name) => {
-  for (const v of ['17', '16', '15', '14']) {
+  let versions = [];
+  try { versions = readdirSync('/usr/lib/postgresql').sort((a, b) => Number(b) - Number(a)); } catch { /* yo'q */ }
+  for (const v of versions) {
     const p = `/usr/lib/postgresql/${v}/bin/${name}`;
     try { readFileSync(p); return p; } catch { /* keyingisi */ }
   }
@@ -38,17 +42,17 @@ if (!base) {
 
 let code = 1;
 try {
-  const psql = (db, sqlText) => {
-    const r = spawnSync('psql', [base + db, '-v', 'ON_ERROR_STOP=1', '-q', '-c', sqlText], { encoding: 'utf8' });
-    if (r.status !== 0) throw new Error(r.stderr);
-  };
-  psql('postgres', 'drop database if exists soglom_tmpl');
-  psql('postgres', 'create database soglom_tmpl');
+  // migratsiyalar Node orqali (psql klienti shart emas)
+  const admin = postgres(base + 'postgres', { max: 1, onnotice: () => {} });
+  await admin.unsafe('drop database if exists soglom_tmpl');
+  await admin.unsafe('create database soglom_tmpl');
+  await admin.end();
+  const tmpl = postgres(base + 'soglom_tmpl', { max: 1, onnotice: () => {} });
   const migDir = join(root, 'supabase', 'migrations');
   for (const f of readdirSync(migDir).filter((x) => x.endsWith('.sql')).sort()) {
-    const r = spawnSync('psql', [base + 'soglom_tmpl', '-v', 'ON_ERROR_STOP=1', '-q', '-f', join(migDir, f)], { encoding: 'utf8' });
-    if (r.status !== 0) throw new Error(f + ': ' + r.stderr);
+    try { await tmpl.unsafe(readFileSync(join(migDir, f), 'utf8')); } catch (e) { throw new Error(f + ': ' + e.message); }
   }
+  await tmpl.end();
   const files = readdirSync(join(root, 'test', 'supabase')).filter((f) => f.endsWith('.test.mjs')).map((f) => join('test', 'supabase', f));
   const args = ['--test', '--test-concurrency=1', ...process.argv.slice(2), ...files];
   const r = spawnSync(process.execPath, args, { cwd: root, stdio: 'inherit', env: { ...process.env, SOGLOM_PG_BASE: base } });
