@@ -187,6 +187,10 @@ var ACTIONS = {
       return p.holat === 'yetkazildi' ? markDelivered_(ctx, p.id, p.izoh) : markFailed_(ctx, p.id, p.sabab, p.izoh);
     }
   },
+  catalog: { r: R_ANY, fn: function () { return catalogView_(); } },
+  catalogAdd: { r: R_STAFF, w: 1, fn: function (ctx, p) { return catalogAdd_(ctx, p); } },
+  catalogRemove: { r: R_STAFF, w: 1, fn: function (ctx, p) { return catalogRemove_(ctx, p); } },
+  catalogMove: { r: R_STAFF, w: 1, fn: function (ctx, p) { return catalogMove_(ctx, p); } },
   kitchen: { r: R_STAFF, fn: function (ctx, p) { return kitchenReport_(p.sana); } },
   fileView: { r: R_STAFF, fn: function (ctx, p) { return fileView_(ctx, p); } },
 

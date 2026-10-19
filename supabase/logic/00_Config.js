@@ -32,7 +32,7 @@ var SCHEMA = {
     ['moljal', 's'], ['hudud', 's'], ['faol', 'b']
   ],
   Ratsionlar: [
-    ['id', 's'], ['nom', 's'], ['kaloriya', 'n'], ['tavsif', 's'],
+    ['id', 's'], ['nom', 's'], ['kaloriya', 's'], ['tavsif', 's'],
     ['tannarx_ovqat', 'n'], ['tannarx_qadoq_yetkazish', 'n'], ['faol', 'b']
   ],
   Narxlar: [
@@ -126,6 +126,7 @@ var DEFAULT_SETTINGS = {
   backup_papka_id: '',
   arxiv_papka_id: '',
   chek_papka_id: '',
+  katalog: '[]',                         // oylik katalog rasmlari: [{"yol":"...","nom":"..."}]
   rozilik_matni: "Ro'yxatdan o'tish orqali ism, telefon raqami va manzilingiz buyurtmani yetkazish va xizmat ko'rsatish uchun qayta ishlanishiga rozilik bildirasiz. Istalgan vaqtda ma'lumotlaringizni o'chirishni so'rashingiz mumkin."
 };
 

@@ -61,7 +61,8 @@ export function getRuntime() {
       WEBAPP_URL: Deno.env.get('WEBAPP_URL') || '',
       ADMIN_TG_IDS: Deno.env.get('ADMIN_TG_IDS') || '',
       WEBHOOK_SECRET: Deno.env.get('WEBHOOK_SECRET') || '',
-      CRON_SECRET: Deno.env.get('CRON_SECRET') || ''
+      CRON_SECRET: Deno.env.get('CRON_SECRET') || '',
+      PUBLIC_STORAGE_URL: must('SUPABASE_URL') + '/storage/v1/object/public/'
     }
   });
   return runtime;

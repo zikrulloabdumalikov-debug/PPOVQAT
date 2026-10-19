@@ -134,6 +134,10 @@ function clientHome_(client) {
         narx_muddati: v.narx_muddati, chek_yuborilgan: v.tolovlar.some(function (p) { return p.holat === 'kutilmoqda'; }) };
     }),
     menyu: { bugun: menuFor_(t, rid), ertaga: menuFor_(addDays_(t, 1), rid) },
+    doimiy_menyu: all_('Ratsionlar').filter(function (r) {
+      return r.faol && r.tavsif && (!rid || r.id === rid);
+    }).map(function (r) { return { ratsion_id: r.id, ratsion: r.nom, kaloriya: r.kaloriya, taomlar: r.tavsif }; }),
+    katalog_bor: catalogList_().length > 0,
     keshbek: cashbackBalance_(client.id),
     karta: { raqam: setting_('karta_raqami'), egasi: setting_('karta_egasi') },
     aloqa: setting_('aloqa_telefon'),

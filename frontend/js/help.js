@@ -22,29 +22,28 @@
           '<b>Narx va paketlar</b> — ratsion (nomi, kaloriyasi, tannarxi, kunlik narxi), paketlar (6/12/24 kun va chegirma), keshbek qoidasi. ' + link('pricing', 'Ochish'),
           '<b>Sozlamalar</b> — karta raqami va egasi, aloqa telefoni, hududlar ro\'yxati, kesish vaqti. ' + link('settings', 'Ochish'),
           '<b>Foydalanuvchilar</b> — operator va kuryerlarni qo\'shing. Ularning Telegram ID si kerak: har biri botga <code>/id</code> deb yozsa, bot ID sini aytadi. ' + link('users', 'Ochish'),
-          '<b>Menyu</b> — kamida bugun va ertangi kun menyusini kiriting. ' + link('menu-edit', 'Ochish'),
+          '<b>Menyu va katalog</b> — oylik katalog rasmlarini yuklang (doimiy menyu ratsion ichida yoziladi). ' + link('menu-edit', 'Ochish'),
           'Boshqa Telegram akkauntdan o\'zingiz mijoz bo\'lib sinab ko\'ring: ro\'yxatdan o\'ting, buyurtma bering, chek yuboring, keyin shu yerdan tasdiqlang.'
         ])
     },
     {
-      id: 'mijoz', icon: '👀', title: 'Mijoz narx, kaloriya va menyuni qayerda ko\'radi',
+      id: 'mijoz', icon: '👀', title: 'Mijoz narx, kaloriya, menyu va katalogni qayerda ko\'radi',
       body: '<p>Mijoz botdagi <b>"Ilova"</b> tugmasini bosadi. Pastki menyuda bo\'limlar bor:</p>' +
-        '<table class="tbl small"><thead><tr><th>Mijoz bo\'limi</th><th>Nimani ko\'radi</th><th>Qayerdan olinadi</th></tr></thead><tbody>' +
-        '<tr><td>🏠 Bosh sahifa</td><td>Faol paketi va qolgan kunlar, keshbek balansi, <b>bugungi va ertangi menyu (kaloriya bilan)</b></td><td>Menyu bo\'limi</td></tr>' +
-        '<tr><td>🛒 Buyurtma</td><td>Ratsion nomi va <b>kaloriyasi</b>, tavsifi; har paket uchun <b>jami narx, kuniga narx, tejash, keshbek</b>; yakuniy summa</td><td>Narx va paketlar</td></tr>' +
-        '<tr><td>🏷 Chegirmalar (Ko\'proq ichida)</td><td>Barcha paketlar yonma-yon jadvalda: necha kun, jami, kuniga, tejaysiz, keshbek</td><td>Narx va paketlar</td></tr>' +
-        '<tr><td>💰 Keshbek</td><td>Balans, tarix, muddati tugayotgan summa</td><td>Avtomatik</td></tr>' +
-        '<tr><td>📦 Buyurtmalarim</td><td>Kunlar kalendari, pauza tugmasi, to\'lov holati</td><td>Avtomatik</td></tr>' +
+        '<table class="tbl small"><thead><tr><th>Mijoz bo\'limi</th><th>Nimani ko\'radi</th><th>Siz qayerda kiritasiz</th></tr></thead><tbody>' +
+        '<tr><td>🏠 Bosh sahifa</td><td>Faol paketi, qolgan kunlar, keshbek, <b>menyu</b> va <b>katalog</b> havolasi</td><td>Narx va paketlar (menyu), Menyu va katalog</td></tr>' +
+        '<tr><td>🛒 Buyurtma</td><td>Ratsion nomi, <b>kaloriyasi</b>, <b>menyusi</b>; har paket uchun <b>jami narx, kuniga narx, tejash, keshbek</b></td><td>Narx va paketlar</td></tr>' +
+        '<tr><td>📚 Katalog (Ko\'proq ichida)</td><td>Siz yuklagan oylik katalog rasmlari</td><td>Menyu va katalog</td></tr>' +
+        '<tr><td>🏷 Chegirmalar (Ko\'proq ichida)</td><td>Har ratsion: kaloriya, menyu va barcha paketlar narxi jadvalda</td><td>Narx va paketlar</td></tr>' +
+        '<tr><td>💰 Keshbek, 📦 Buyurtmalarim</td><td>Balans, tarix, kunlar kalendari, pauza</td><td>Avtomatik</td></tr>' +
         '</tbody></table>' +
-        tip('Kaloriya ikki joydan keladi: ratsionning umumiy kaloriyasi (Narx va paketlar → ratsion) va har kunlik menyuning kaloriyasi (Menyu). Kunlik menyuda kaloriya yozilmasa, ratsionniki ko\'rsatiladi.') +
-        tip('Mijoz menyuni faqat bugun va ertaga uchun ko\'radi. Agar haftalik menyuni ham ko\'rishini xohlasangiz, ayting — qo\'shib beramiz.')
+        tip('Narx, kaloriya va menyu bir marta kiritiladi: ' + link('pricing', 'Narx va paketlar') + ' → ratsion. Katalog rasmlari: ' + link('menu-edit', 'Menyu va katalog') + '.')
     },
     {
       id: 'narx', icon: '🏷', title: 'Narx, paket va keshbekni kiritish', p: true,
       body: '<h4>Yangi ratsion</h4>' +
         steps([
           link('pricing', 'Narx va paketlar') + ' → <b>+ Ratsion</b>.',
-          '<b>Nomi</b> (masalan "Ozish Express"), <b>Kaloriya</b> (kuniga, masalan 1200), <b>Tavsif</b> (mijozga ko\'rinadi, masalan "Kuniga 5 mahal").',
+          '<b>Nomi</b> (masalan "Ozish Express"), <b>Kaloriya</b> (kuniga: bitta son yoki oraliq, masalan <code>900–1000</code>), <b>Menyu / tavsif</b> (mijozga ko\'rinadi).',
           '<b>Ovqat tannarxi</b> va <b>Qadoq va yetkazish tannarxi</b> — bir kunlik xarajatingiz. Mijozga ko\'rinmaydi, faqat zarar bo\'lmasligini tekshirish uchun.',
           '<b>Boshlang\'ich kunlik narx</b> — mijoz to\'laydigan kunlik narx. <b>Saqlash</b>.'
         ]) +
@@ -65,17 +64,28 @@
         tip('Agar chegirma va keshbekdan keyingi narx tannarxdan past bo\'lsa, qizil <b>"Marja qo\'riqchisi"</b> oynasi chiqadi. Bu zarar degani. Ataylab qilayotgan bo\'lsangiz "Baribir saqlash" ni bosing.')
     },
     {
-      id: 'menyu', icon: '🍽', title: 'Haftalik menyuni kiritish',
-      body: steps([
-          link('menu-edit', 'Menyu') + ' bo\'limini oching. Ekranda 7 kun ko\'rinadi. <b>‹</b> va <b>›</b> tugmalari bilan oldingi/keyingi haftaga o\'tasiz.',
-          'Kerakli kun yonidagi <b>+</b> ni bosing.',
-          '<b>Ratsion</b> ni tanlang, <b>Taomlar</b> ga shu kunning menyusini yozing, <b>Kaloriya</b> ni kiriting → <b>Saqlash</b>.',
-          'Har bir ratsion uchun har kunga bitta yozuv. Bir kunga ikkinchi marta kiritsangiz, eskisi yangilanadi.',
-          'Tuzatish yoki o\'chirish: menyu yozuvini bosing → o\'zgartiring yoki <b>O\'chirish</b>.'
+      id: 'menyu', icon: '🍽', title: 'Menyuni kiritish',
+      body: '<h4>Doimiy menyu (bir marta)</h4>' +
+        steps([
+          link('pricing', 'Narx va paketlar') + ' → ratsion kartasida <b>Tahrirlash</b>.',
+          '<b>Menyu / tavsif</b> maydoniga menyuni yozing (har qatorga bitta ovqat vaqti) → <b>Saqlash</b>.'
         ]) +
-        '<p>Taomlarni har qatorga bittadan yozish qulay:</p>' +
         '<pre class="help-pre">Nonushta: suli bo\'tqasi, yong\'oq\nTushlik: tovuq ko\'krak, grechka, salat\nKechki: baliq, sabzavotlar</pre>' +
-        tip('Haftalik menyuni dushanba kuni bir yo\'la 7 kunga kiritib qo\'ysangiz, mijozlar har kuni o\'z menyusini ko\'radi va oshxona hisobotida ham chiqadi.')
+        '<p>Mijoz bu menyuni buyurtma berishda, "Chegirmalar" da va bosh sahifada ko\'radi.</p>' +
+        '<h4>Kunlik menyu (ixtiyoriy)</h4>' +
+        '<p>Faqat biror kunda menyu boshqacha bo\'lsa: ' + link('menu-edit', 'Menyu va katalog') + ' → kerakli kun yonidagi <b>+</b> → ratsion, taomlar, kaloriya. ' +
+        'O\'sha kuni mijoz doimiy menyu o\'rniga shuni ko\'radi.</p>'
+    },
+    {
+      id: 'katalog', icon: '📚', title: 'Oylik katalogni joylash',
+      body: steps([
+          link('menu-edit', 'Menyu va katalog') + ' ni oching. Eng yuqorida <b>📚 Oylik katalog</b> bloki.',
+          '<b>+ Rasm qo\'shish</b> → telefoningizdan katalog rasmlarini tanlang (bir nechtasini birdan tanlash mumkin).',
+          'Rasmlar mijozga shu tartibda ko\'rinadi. Tartibni <b>↑</b> bilan o\'zgartirasiz.',
+          'Yangi oy katalogi chiqsa: eski rasmlarni <b>✕</b> bilan olib tashlang va yangilarini qo\'shing.'
+        ]) +
+        tip('Mijoz bosh sahifasida "📚 Oylik katalog" kartasi chiqadi, bosganda katalog ochiladi. Rasmni bossa, kattalashtirib ko\'radi.') +
+        tip('JPG yoki PNG rasm yuklang. Katalog PDF bo\'lsa, avval sahifalarini rasm qilib saqlang.')
     },
     {
       id: 'buyurtma', icon: '📦', title: 'Buyurtma va to\'lovni tasdiqlash',

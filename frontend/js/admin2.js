@@ -32,7 +32,7 @@
       html += '<div class="card"><div class="row between"><h3>Ratsionlar</h3><button class="btn small" data-click="ration">+ Ratsion</button></div>' +
         d.ratsionlar.map(function (r, i) {
           return '<div class="sub-card"><div class="row between wrap"><div><b>' + esc(r.nom) + '</b> ' + (r.faol ? '' : '<span class="badge">nofaol</span>') +
-            '<div class="small muted">' + (r.kaloriya || '—') + ' kkal · tannarx ' + money(r.tannarx) + ' (ovqat ' + money(r.tannarx_ovqat) + ' + qadoq/yetkazish ' + money(r.tannarx_qadoq_yetkazish) + ')</div></div>' +
+            '<div class="small muted">' + esc(r.kaloriya || '—') + ' kkal · tannarx ' + money(r.tannarx) + ' (ovqat ' + money(r.tannarx_ovqat) + ' + qadoq/yetkazish ' + money(r.tannarx_qadoq_yetkazish) + ')</div></div>' +
             '<div class="right"><div class="big">' + money(r.joriy_narx) + '</div><div class="small muted">so\'m/kun</div></div></div>' +
             '<div class="row gap mt"><button class="btn small" data-click="price" data-i="' + i + '">Yangi narx</button><button class="btn small ghost" data-click="ration" data-i="' + i + '">Tahrirlash</button></div>' +
             (r.tarix.length ? '<details class="mt"><summary class="small">Narx tarixi (' + r.tarix.length + ')</summary><table class="tbl small">' + r.tarix.map(function (n) {
@@ -61,8 +61,9 @@
           var r = el.dataset.i !== undefined ? d.ratsionlar[+el.dataset.i] : { faol: true };
           var s = UI.sheet(r.id ? 'Ratsionni tahrirlash' : 'Yangi ratsion', '<form class="stack" data-submit="save">' +
             UI.field('Nomi', '<input name="nom" required value="' + esc(r.nom || '') + '">') +
-            UI.field('Kaloriya', '<input name="kaloriya" type="number" min="0" value="' + esc(r.kaloriya || '') + '">') +
-            UI.field('Tavsif', '<input name="tavsif" value="' + esc(r.tavsif || '') + '">') +
+            UI.field('Kaloriya (kuniga)', '<input name="kaloriya" maxlength="30" placeholder="1200 yoki 900–1000" value="' + esc(r.kaloriya || '') + '">') +
+            UI.field('Menyu / tavsif (mijozga ko\'rinadi)', '<textarea name="tavsif" rows="5" maxlength="2000" placeholder="Nonushta: ...\nTushlik: ...\nKechki: ...">' + esc(r.tavsif || '') + '</textarea>',
+              'Doimiy menyu shu yerga yoziladi. Mijoz buyurtma berishda va bosh sahifada ko\'radi.') +
             UI.field('Ovqat tannarxi (so\'m/kun)', '<input name="tannarx_ovqat" type="number" min="0" required value="' + esc(r.tannarx_ovqat || 0) + '">') +
             UI.field('Qadoq va yetkazish tannarxi (so\'m/kun)', '<input name="tannarx_qadoq_yetkazish" type="number" min="0" required value="' + esc(r.tannarx_qadoq_yetkazish || 0) + '">') +
             '<label class="chk"><input type="checkbox" name="faol"' + (r.faol ? ' checked' : '') + '> Sotuvda</label>' +
@@ -71,7 +72,7 @@
             save: function (form) {
               var f = UI.formData(form);
               f.id = r.id;
-              ['kaloriya', 'tannarx_ovqat', 'tannarx_qadoq_yetkazish'].forEach(function (k2) { f[k2] = Number(f[k2] || 0); });
+              ['tannarx_ovqat', 'tannarx_qadoq_yetkazish'].forEach(function (k2) { f[k2] = Number(f[k2] || 0); });
               return withMarginGuard('rationSave', f).then(function (saved) {
                 if (!r.id && f.narx) return withMarginGuard('priceAdd', { ratsion_id: saved.id, kunlik_narx: Number(f.narx), qachondan: today });
               }).then(function () { s.close(); UI.toast('Saqlandi'); UI.reload(); });
@@ -597,7 +598,7 @@
       { path: 'orders', icon: '📦', label: 'Buyurtmalar' },
       { path: 'clients', icon: '👥', label: 'Mijozlar' },
       { path: 'delivery', icon: '🛵', label: 'Yetkazish' },
-      { path: 'menu-edit', icon: '🍽', label: 'Menyu', more: true }
+      { path: 'menu-edit', icon: '🍽', label: 'Menyu va katalog', more: true }
     ];
     if (partner) {
       nav = nav.concat([

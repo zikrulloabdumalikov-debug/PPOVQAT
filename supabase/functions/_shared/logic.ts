@@ -39,7 +39,7 @@ var SCHEMA = {
     ['moljal', 's'], ['hudud', 's'], ['faol', 'b']
   ],
   Ratsionlar: [
-    ['id', 's'], ['nom', 's'], ['kaloriya', 'n'], ['tavsif', 's'],
+    ['id', 's'], ['nom', 's'], ['kaloriya', 's'], ['tavsif', 's'],
     ['tannarx_ovqat', 'n'], ['tannarx_qadoq_yetkazish', 'n'], ['faol', 'b']
   ],
   Narxlar: [
@@ -133,6 +133,7 @@ var DEFAULT_SETTINGS = {
   backup_papka_id: '',
   arxiv_papka_id: '',
   chek_papka_id: '',
+  katalog: '[]',                         // oylik katalog rasmlari: [{"yol":"...","nom":"..."}]
   rozilik_matni: "Ro'yxatdan o'tish orqali ism, telefon raqami va manzilingiz buyurtmani yetkazish va xizmat ko'rsatish uchun qayta ishlanishiga rozilik bildirasiz. Istalgan vaqtda ma'lumotlaringizni o'chirishni so'rashingiz mumkin."
 };
 
@@ -724,7 +725,7 @@ var SETTING_VALIDATORS = {
   paket_eslatma_kun: 'int', keshbek_eslatma_kun: 'int',
   bayramlar: 'jsonDates', hududlar: 'jsonStrings', kuryer_hudud: 'jsonObj', sherik_ulushlari: 'jsonShares',
   reja: 'jsonPairs', dam_kunlari: 'weekdays', bizning_xato_qoida: 'faultRule',
-  ishga_tushish_sana: 'dateOpt'
+  ishga_tushish_sana: 'dateOpt', katalog: 'jsonList'
 };
 
 function validateSetting_(key, value) {
@@ -760,6 +761,7 @@ function validateSetting_(key, value) {
       var total = sum_(parsed, function (p) { return p.foiz; });
       if (Math.abs(total - 100) > 0.01) fail('Sheriklar ulushi yig\'indisi 100% bo\'lishi kerak');
     }
+    if (kind === 'jsonList' && !Array.isArray(parsed)) fail(key + ': ro\'yxat kerak');
     if (kind === 'jsonPairs' && !(Array.isArray(parsed) && parsed.every(function (p) { return Array.isArray(p) && p.length === 2; }))) fail(key + ': [[kun, son], ...] kerak');
     return JSON.stringify(parsed);
   }
@@ -2776,6 +2778,10 @@ function clientHome_(client) {
         narx_muddati: v.narx_muddati, chek_yuborilgan: v.tolovlar.some(function (p) { return p.holat === 'kutilmoqda'; }) };
     }),
     menyu: { bugun: menuFor_(t, rid), ertaga: menuFor_(addDays_(t, 1), rid) },
+    doimiy_menyu: all_('Ratsionlar').filter(function (r) {
+      return r.faol && r.tavsif && (!rid || r.id === rid);
+    }).map(function (r) { return { ratsion_id: r.id, ratsion: r.nom, kaloriya: r.kaloriya, taomlar: r.tavsif }; }),
+    katalog_bor: catalogList_().length > 0,
     keshbek: cashbackBalance_(client.id),
     karta: { raqam: setting_('karta_raqami'), egasi: setting_('karta_egasi') },
     aloqa: setting_('aloqa_telefon'),
@@ -3263,8 +3269,8 @@ function guardMargin_(warnings, p) {
 function rationSave_(ctx, p) {
   var row = {
     nom: reqStr_(p.nom, 'Nomi', 80),
-    kaloriya: reqInt_(p.kaloriya || 0, 'Kaloriya', 0, 10000),
-    tavsif: optStr_(p.tavsif, 500),
+    kaloriya: optStr_(p.kaloriya, 30),       // son yoki oraliq: "1200", "900–1000"
+    tavsif: optStr_(p.tavsif, 2000),         // doimiy menyu / tavsif (mijozga ko'rinadi)
     tannarx_ovqat: reqMoney_(p.tannarx_ovqat || 0, 'Ovqat tannarxi', true),
     tannarx_qadoq_yetkazish: reqMoney_(p.tannarx_qadoq_yetkazish || 0, 'Qadoq va yetkazish tannarxi', true),
     faol: p.faol !== false
@@ -3346,6 +3352,54 @@ function fileView_(ctx, p) {
   return { data: readImage_(fileId) };
 }
 
+// ---------- Oylik katalog (rasmlar) ----------
+
+var CATALOG_MAX = 12;
+
+function catalogList_() {
+  var list = settingJson_('katalog', []);
+  return Array.isArray(list) ? list : [];
+}
+
+/** Mijoz va xodimlar uchun: rasmlarning ochiq manzillari. */
+function catalogView_() {
+  var base = ENV_.PUBLIC_STORAGE_URL || '';
+  return {
+    rasmlar: catalogList_().map(function (x, i) {
+      return { i: i, nom: x.nom || '', url: base + x.yol, yuklangan: x.yuklangan || '' };
+    }),
+    yangilangan: catalogList_().reduce(function (m, x) { return x.yuklangan > m ? x.yuklangan : m; }, '')
+  };
+}
+
+function catalogAdd_(ctx, p) {
+  var list = catalogList_();
+  if (list.length >= CATALOG_MAX) fail('Katalogda ko\'pi bilan ' + CATALOG_MAX + ' ta rasm bo\'ladi');
+  var yol = saveImage_(p.rasm, 'katalog', 'katalog');
+  list.push({ yol: yol, nom: optStr_(p.nom, 80), yuklangan: today_() });
+  saveSettings_({ katalog: JSON.stringify(list) }, actor_(ctx));
+  return catalogView_();
+}
+
+/** Rasmni katalogdan olib tashlash (fayl Storage'da qoladi — hech narsa jismoniy o'chirilmaydi). */
+function catalogRemove_(ctx, p) {
+  var list = catalogList_();
+  var i = Number(p.i);
+  if (!(i >= 0 && i < list.length)) fail('Rasm topilmadi', 'topilmadi');
+  list.splice(i, 1);
+  saveSettings_({ katalog: JSON.stringify(list) }, actor_(ctx));
+  return catalogView_();
+}
+
+function catalogMove_(ctx, p) {
+  var list = catalogList_();
+  var i = Number(p.i), j = i + (p.yon === 'yuqori' ? -1 : 1);
+  if (!(i >= 0 && i < list.length && j >= 0 && j < list.length)) return catalogView_();
+  var t = list[i]; list[i] = list[j]; list[j] = t;
+  saveSettings_({ katalog: JSON.stringify(list) }, actor_(ctx));
+  return catalogView_();
+}
+
 // ===== 13_Telegram.js =====
 /**
  * Telegram bot: xabarlar navbati (6.3, 8.3), webhook mantiqi, chek rasmlari.
@@ -3354,7 +3408,7 @@ function fileView_(ctx, p) {
  */
 
 var NOTIFY_QUEUE = [];
-/** Runtime o'rnatadi: { WEBAPP_URL, ADMIN_TG_IDS, ALLOW_TEST_SEED } — sir kalitlar bu yerga kelmaydi. */
+/** Runtime o'rnatadi: { WEBAPP_URL, ADMIN_TG_IDS, ALLOW_TEST_SEED, PUBLIC_STORAGE_URL } — sir kalitlar bu yerga kelmaydi. */
 var ENV_ = {};
 
 function webAppUrl_() {
@@ -3409,15 +3463,16 @@ function fmtDate_(s) {
 var IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 /** data:image/...;base64,... → "cheklar/<fayl>" yo'li. Yuklash runtime'da, DB yozuvidan oldin. */
-function saveImage_(dataUrl, name) {
+function saveImage_(dataUrl, name, bucket) {
+  var b = bucket || 'cheklar';
   var m = String(dataUrl || '').match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
   if (!m) fail('Rasm formati noto\'g\'ri (JPG, PNG yoki WEBP)');
   var size = Math.floor(m[2].length * 3 / 4);
   if (size > IMAGE_MAX_BYTES) fail('Rasm juda katta (5 MB gacha)');
   var ext = m[1] === 'image/png' ? 'png' : m[1] === 'image/webp' ? 'webp' : 'jpg';
   var path = String(name).replace(/[^A-Za-z0-9_-]/g, '_') + '_' + today_() + '_' + uid_() + '.' + ext;
-  OPS.push({ op: 'upload', bucket: 'cheklar', path: path, contentType: m[1], base64: m[2] });
-  return 'cheklar/' + path;
+  OPS.push({ op: 'upload', bucket: b, path: path, contentType: m[1], base64: m[2] });
+  return b + '/' + path;
 }
 
 /** Rasmni o'qish runtime'da (asinxron): bu yerda faqat belgi qaytariladi. */
@@ -3824,6 +3879,10 @@ var ACTIONS = {
       return p.holat === 'yetkazildi' ? markDelivered_(ctx, p.id, p.izoh) : markFailed_(ctx, p.id, p.sabab, p.izoh);
     }
   },
+  catalog: { r: R_ANY, fn: function () { return catalogView_(); } },
+  catalogAdd: { r: R_STAFF, w: 1, fn: function (ctx, p) { return catalogAdd_(ctx, p); } },
+  catalogRemove: { r: R_STAFF, w: 1, fn: function (ctx, p) { return catalogRemove_(ctx, p); } },
+  catalogMove: { r: R_STAFF, w: 1, fn: function (ctx, p) { return catalogMove_(ctx, p); } },
   kitchen: { r: R_STAFF, fn: function (ctx, p) { return kitchenReport_(p.sana); } },
   fileView: { r: R_STAFF, fn: function (ctx, p) { return fileView_(ctx, p); } },
 

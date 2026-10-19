@@ -71,7 +71,8 @@ export async function makeEnv(opts = {}) {
   };
   const env = {
     BOT_TOKEN: TOKEN, ADMIN_TG_IDS: IDS.partner + ',' + IDS.partner2, WEBAPP_URL: 'https://example.test/app/',
-    WEBHOOK_SECRET: 'whsec-test', CRON_SECRET: 'crsec-test', ALLOW_TEST_SEED: 'ha'
+    WEBHOOK_SECRET: 'whsec-test', CRON_SECRET: 'crsec-test', ALLOW_TEST_SEED: 'ha',
+    PUBLIC_STORAGE_URL: 'https://test.supabase.co/storage/v1/object/public/'
   };
   const rt = createRuntime({ sql, env, storage, fetch: fakeFetch, onLock: () => { stats.locks++; } });
   await rt.runTask('seedExample');

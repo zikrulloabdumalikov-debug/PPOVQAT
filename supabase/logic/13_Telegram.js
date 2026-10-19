@@ -5,7 +5,7 @@
  */
 
 var NOTIFY_QUEUE = [];
-/** Runtime o'rnatadi: { WEBAPP_URL, ADMIN_TG_IDS, ALLOW_TEST_SEED } — sir kalitlar bu yerga kelmaydi. */
+/** Runtime o'rnatadi: { WEBAPP_URL, ADMIN_TG_IDS, ALLOW_TEST_SEED, PUBLIC_STORAGE_URL } — sir kalitlar bu yerga kelmaydi. */
 var ENV_ = {};
 
 function webAppUrl_() {
@@ -60,15 +60,16 @@ function fmtDate_(s) {
 var IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 /** data:image/...;base64,... → "cheklar/<fayl>" yo'li. Yuklash runtime'da, DB yozuvidan oldin. */
-function saveImage_(dataUrl, name) {
+function saveImage_(dataUrl, name, bucket) {
+  var b = bucket || 'cheklar';
   var m = String(dataUrl || '').match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
   if (!m) fail('Rasm formati noto\'g\'ri (JPG, PNG yoki WEBP)');
   var size = Math.floor(m[2].length * 3 / 4);
   if (size > IMAGE_MAX_BYTES) fail('Rasm juda katta (5 MB gacha)');
   var ext = m[1] === 'image/png' ? 'png' : m[1] === 'image/webp' ? 'webp' : 'jpg';
   var path = String(name).replace(/[^A-Za-z0-9_-]/g, '_') + '_' + today_() + '_' + uid_() + '.' + ext;
-  OPS.push({ op: 'upload', bucket: 'cheklar', path: path, contentType: m[1], base64: m[2] });
-  return 'cheklar/' + path;
+  OPS.push({ op: 'upload', bucket: b, path: path, contentType: m[1], base64: m[2] });
+  return b + '/' + path;
 }
 
 /** Rasmni o'qish runtime'da (asinxron): bu yerda faqat belgi qaytariladi. */

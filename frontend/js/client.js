@@ -75,7 +75,7 @@
   function menuBlock(title, items) {
     if (!items.length) return '<div class="menu-day"><div class="muted small">' + title + '</div><div class="muted">Menyu hali kiritilmagan</div></div>';
     return '<div class="menu-day"><div class="muted small">' + title + '</div>' + items.map(function (m) {
-      return '<div class="menu-item"><b>' + esc(m.ratsion) + '</b> · ' + esc(m.kaloriya || '') + ' kkal<div>' + esc(m.taomlar) + '</div></div>';
+      return '<div class="menu-item"><b>' + esc(m.ratsion) + '</b>' + (m.kaloriya ? ' · ' + esc(m.kaloriya) + ' kkal' : '') + '<div>' + esc(m.taomlar) + '</div></div>';
     }).join('') + '</div>';
   }
 
@@ -101,7 +101,17 @@
       }
       html += '<a class="card link" href="#/cashback"><div class="row between"><div><div class="muted small">Keshbek balansi</div><div class="big">' +
         som(d.keshbek) + '</div></div><span class="big-ico">💰</span></div></a>';
-      html += '<div class="card"><h3>Menyu</h3>' + menuBlock('Bugun', d.menyu.bugun) + menuBlock('Ertaga', d.menyu.ertaga) + '</div>';
+      if (d.katalog_bor) {
+        html += '<a class="card link accent" href="#/catalog"><div class="row between"><div><b>📚 Oylik katalog</b>' +
+          '<div class="small muted">Yangi taomlar va takliflar</div></div><span>›</span></div></a>';
+      }
+      if (d.menyu.bugun.length || d.menyu.ertaga.length) {
+        html += '<div class="card"><h3>Menyu</h3>' + menuBlock('Bugun', d.menyu.bugun) + menuBlock('Ertaga', d.menyu.ertaga) + '</div>';
+      } else if (d.doimiy_menyu.length) {
+        html += '<div class="card"><h3>Menyu</h3>' + d.doimiy_menyu.map(function (m) {
+          return '<div class="menu-item"><b>' + esc(m.ratsion) + '</b>' + (m.kaloriya ? ' · ' + esc(m.kaloriya) + ' kkal' : '') + '<div>' + esc(m.taomlar) + '</div></div>';
+        }).join('') + '</div>';
+      }
       html += '<a class="card link" href="#/discounts"><div class="row between"><b>🏷 Chegirmalar va paketlar</b><span>›</span></div>' +
         '<div class="small muted">Qancha tejashingizni ko\'ring</div></a>';
       if (d.aloqa) html += '<p class="center small muted">Savollar: <a href="tel:' + esc(d.aloqa) + '">' + esc(d.aloqa) + '</a> · Yetkazish ' + esc(d.yetkazish_vaqti) + '</p>';
@@ -133,8 +143,8 @@
         var html = '<h1>Buyurtma berish</h1>' +
           '<h3 class="sec">1. Ratsion</h3><div class="chips">' + rations.map(function (x) {
             return '<button class="chip-btn ' + (x.id === st.ratsion_id ? 'on' : '') + '" data-click="ration" data-id="' + esc(x.id) + '">' +
-              esc(x.nom) + (x.kaloriya ? ' · ' + x.kaloriya + ' kkal' : '') + '</button>';
-          }).join('') + '</div>' + (r.tavsif ? '<p class="small muted">' + esc(r.tavsif) + '</p>' : '') +
+              esc(x.nom) + (x.kaloriya ? ' · ' + esc(x.kaloriya) + ' kkal' : '') + '</button>';
+          }).join('') + '</div>' + (r.tavsif ? '<div class="menu-text small">' + esc(r.tavsif) + '</div>' : '') +
           '<h3 class="sec">2. Paket</h3><div class="pkgs">' + r.paketlar.map(function (p) {
             return '<button class="pkg ' + (p.paket_id === st.paket_id ? 'on' : '') + '" data-click="pkg" data-id="' + esc(p.paket_id) + '">' +
               '<div class="pkg-days">' + p.kunlar + ' kun</div>' +
@@ -267,7 +277,8 @@
       var html = '<h1>Chegirmalar</h1><p class="muted">Uzoqroq paket — kuniga arzonroq va ko\'proq keshbek. Keshbek: to\'langan summaning ' +
         c.keshbek.foiz + '%, ' + c.keshbek.amal_muddati_kun + ' kun amal qiladi.</p>';
       c.ratsionlar.forEach(function (r) {
-        html += '<div class="card"><h3>' + esc(r.nom) + (r.kaloriya ? ' <span class="muted small">' + r.kaloriya + ' kkal</span>' : '') + '</h3>' +
+        html += '<div class="card"><h3>' + esc(r.nom) + (r.kaloriya ? ' <span class="muted small">' + esc(r.kaloriya) + ' kkal</span>' : '') + '</h3>' +
+          (r.tavsif ? '<div class="menu-text small muted mb">' + esc(r.tavsif) + '</div>' : '') +
           '<div class="table-wrap"><table class="tbl"><thead><tr><th>Paket</th><th>Jami</th><th>Kuniga</th><th>Tejaysiz</th><th>Keshbek</th></tr></thead><tbody>' +
           r.paketlar.map(function (p) {
             return '<tr><td><b>' + p.kunlar + ' kun</b>' + (p.chegirma_foiz ? ' <span class="badge st-faol">−' + p.chegirma_foiz + '%</span>' : '') + '</td>' +
@@ -401,6 +412,19 @@
     });
   }
 
+  // ---------- Oylik katalog ----------
+  function catalogPage() {
+    return api('catalog').then(function (c) {
+      if (!c.rasmlar.length) return UI.view('<h1>Katalog</h1>' + UI.empty('📚', 'Katalog hali joylanmagan'));
+      UI.view('<h1>📚 Katalog</h1>' + (c.yangilangan ? '<p class="small muted">Yangilangan: ' + UI.date(c.yangilangan) + '</p>' : '') +
+        c.rasmlar.map(function (x) {
+          return '<a class="catalog-img" href="#" data-click="open" data-url="' + esc(x.url) + '"><img loading="lazy" src="' + esc(x.url) + '" alt="' + esc(x.nom || 'Katalog') + '"></a>';
+        }).join('') + '<a class="btn block mt" href="#/order">🛒 Buyurtma berish</a>', {
+        open: function (el) { UI.openLink(el.dataset.url); }
+      });
+    });
+  }
+
   // ---------- 8. Profil ----------
   function profile() {
     return api('profile').then(function (p) {
@@ -435,6 +459,7 @@
       { path: 'order', icon: '🛒', label: 'Buyurtma' },
       { path: 'orders', icon: '📦', label: 'Buyurtmalarim' },
       { path: 'cashback', icon: '💰', label: 'Keshbek' },
+      { path: 'catalog', icon: '📚', label: 'Katalog', more: true },
       { path: 'discounts', icon: '🏷', label: 'Chegirmalar', more: true },
       { path: 'addresses', icon: '📍', label: 'Manzillarim', more: true },
       { path: 'profile', icon: '👤', label: 'Profil', more: true }
@@ -443,6 +468,7 @@
     UI.route('order', orderPage);
     UI.route('pay/:id', payPage);
     UI.route('discounts', discounts);
+    UI.route('catalog', catalogPage);
     UI.route('cashback', cashback);
     UI.route('orders', orders);
     UI.route('orders/:id', orderDetail);

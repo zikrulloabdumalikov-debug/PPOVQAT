@@ -33,6 +33,8 @@ export interface RuntimeEnv {
   WEBHOOK_SECRET?: string;
   CRON_SECRET?: string;
   ALLOW_TEST_SEED?: string;
+  /** ochiq bucket'lar manzili (katalog rasmlari): <SUPABASE_URL>/storage/v1/object/public/ */
+  PUBLIC_STORAGE_URL?: string;
 }
 
 export interface RuntimeOptions {
@@ -225,7 +227,8 @@ export function createRuntime(opts: RuntimeOptions) {
   const adminIds = String(env.ADMIN_TG_IDS || '').split(',').map((x) => x.trim()).filter((x) => /^\d+$/.test(x));
 
   function setEnv() {
-    Object.assign(L.ENV_, { WEBAPP_URL: env.WEBAPP_URL || '', ADMIN_TG_IDS: adminIds, ALLOW_TEST_SEED: env.ALLOW_TEST_SEED || '' });
+    Object.assign(L.ENV_, { WEBAPP_URL: env.WEBAPP_URL || '', ADMIN_TG_IDS: adminIds, ALLOW_TEST_SEED: env.ALLOW_TEST_SEED || '',
+      PUBLIC_STORAGE_URL: env.PUBLIC_STORAGE_URL || '' });
   }
 
   async function lock(tx: Sql) {

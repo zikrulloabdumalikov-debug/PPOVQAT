@@ -225,8 +225,8 @@ function guardMargin_(warnings, p) {
 function rationSave_(ctx, p) {
   var row = {
     nom: reqStr_(p.nom, 'Nomi', 80),
-    kaloriya: reqInt_(p.kaloriya || 0, 'Kaloriya', 0, 10000),
-    tavsif: optStr_(p.tavsif, 500),
+    kaloriya: optStr_(p.kaloriya, 30),       // son yoki oraliq: "1200", "900–1000"
+    tavsif: optStr_(p.tavsif, 2000),         // doimiy menyu / tavsif (mijozga ko'rinadi)
     tannarx_ovqat: reqMoney_(p.tannarx_ovqat || 0, 'Ovqat tannarxi', true),
     tannarx_qadoq_yetkazish: reqMoney_(p.tannarx_qadoq_yetkazish || 0, 'Qadoq va yetkazish tannarxi', true),
     faol: p.faol !== false
@@ -306,4 +306,52 @@ function fileView_(ctx, p) {
   }
   if (!fileId) fail('Rasm yo\'q');
   return { data: readImage_(fileId) };
+}
+
+// ---------- Oylik katalog (rasmlar) ----------
+
+var CATALOG_MAX = 12;
+
+function catalogList_() {
+  var list = settingJson_('katalog', []);
+  return Array.isArray(list) ? list : [];
+}
+
+/** Mijoz va xodimlar uchun: rasmlarning ochiq manzillari. */
+function catalogView_() {
+  var base = ENV_.PUBLIC_STORAGE_URL || '';
+  return {
+    rasmlar: catalogList_().map(function (x, i) {
+      return { i: i, nom: x.nom || '', url: base + x.yol, yuklangan: x.yuklangan || '' };
+    }),
+    yangilangan: catalogList_().reduce(function (m, x) { return x.yuklangan > m ? x.yuklangan : m; }, '')
+  };
+}
+
+function catalogAdd_(ctx, p) {
+  var list = catalogList_();
+  if (list.length >= CATALOG_MAX) fail('Katalogda ko\'pi bilan ' + CATALOG_MAX + ' ta rasm bo\'ladi');
+  var yol = saveImage_(p.rasm, 'katalog', 'katalog');
+  list.push({ yol: yol, nom: optStr_(p.nom, 80), yuklangan: today_() });
+  saveSettings_({ katalog: JSON.stringify(list) }, actor_(ctx));
+  return catalogView_();
+}
+
+/** Rasmni katalogdan olib tashlash (fayl Storage'da qoladi — hech narsa jismoniy o'chirilmaydi). */
+function catalogRemove_(ctx, p) {
+  var list = catalogList_();
+  var i = Number(p.i);
+  if (!(i >= 0 && i < list.length)) fail('Rasm topilmadi', 'topilmadi');
+  list.splice(i, 1);
+  saveSettings_({ katalog: JSON.stringify(list) }, actor_(ctx));
+  return catalogView_();
+}
+
+function catalogMove_(ctx, p) {
+  var list = catalogList_();
+  var i = Number(p.i), j = i + (p.yon === 'yuqori' ? -1 : 1);
+  if (!(i >= 0 && i < list.length && j >= 0 && j < list.length)) return catalogView_();
+  var t = list[i]; list[i] = list[j]; list[j] = t;
+  saveSettings_({ katalog: JSON.stringify(list) }, actor_(ctx));
+  return catalogView_();
 }

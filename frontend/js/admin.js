@@ -399,11 +399,15 @@
     return api('menuList', { dan: from, gacha: UI.addDays(from, 6) }).then(function (d) {
       var days = [];
       for (var i = 0; i < 7; i++) days.push(UI.addDays(from, i));
-      var html = '<div class="row between wrap"><h1>Menyu</h1><div class="row gap">' +
+      var html = '<h1>Menyu va katalog</h1><div id="catalogBox" class="card"><div class="spinner small"></div></div>' +
+        '<div class="card help-tip">🍽 <b>Doimiy menyu</b> har ratsionga bir marta yoziladi: ' +
+        '<a href="#/pricing">Narx va paketlar</a> → ratsion → <b>Tahrirlash</b> → "Menyu / tavsif". ' +
+        'Pastdagi kunlik menyu ixtiyoriy — faqat biror kunda menyu boshqacha bo\'lsa kiriting.</div>' +
+        '<div class="row between wrap"><h2>Kunlik menyu (ixtiyoriy)</h2><div class="row gap">' +
         '<a class="btn small ghost" href="#/menu-edit?dan=' + UI.addDays(from, -7) + '">‹</a>' +
         '<a class="btn small ghost" href="#/menu-edit">Bugun</a>' +
         '<a class="btn small ghost" href="#/menu-edit?dan=' + UI.addDays(from, 7) + '">›</a></div></div>' +
-        '<p class="hint">Mijoz bosh sahifasida bugungi va ertangi menyu kaloriya bilan ko\'rinadi.</p>';
+        '<p class="hint">Kiritilgan kunda mijoz bosh sahifasida doimiy menyu o\'rniga shu ko\'rinadi.</p>';
       days.forEach(function (day) {
         var items = d.items.filter(function (m) { return m.sana === day; });
         html += '<div class="card"><div class="row between"><h3>' + UI.date(day, true) + '</h3><button class="btn small ghost" data-click="add" data-day="' + day + '">+</button></div>' +
@@ -426,6 +430,7 @@
         add: function (el) { edit({ sana: el.dataset.day }); },
         edit: function (el) { edit(d.items.filter(function (m) { return m.id === el.dataset.id; })[0]); }
       });
+      A.loadCatalogBox();
     });
   }
 
@@ -496,5 +501,49 @@
     UI.route('clients/:id', clientDetail);
     UI.route('menu-edit', menu);
     UI.route('delivery', delivery);
+  };
+})();
+
+/* Oylik katalog: rasmlarni yuklash, tartiblash, olib tashlash (Menyu sahifasida). */
+(function () {
+  'use strict';
+  var A = window.AdminApp;
+  var esc = UI.esc;
+  function render(box, c) {
+    UI.mount(box, '<div class="row between wrap"><h3>📚 Oylik katalog</h3>' +
+      '<label class="btn small upload">+ Rasm qo\'shish<input type="file" accept="image/*" multiple hidden data-change="add"></label></div>' +
+      '<p class="hint">Mijoz ilovada "📚 Katalog" bo\'limida ko\'radi. Yangi oy katalogi chiqsa: eskisini ✕ bilan olib tashlang, yangisini qo\'shing. ' +
+      'Ko\'pi bilan 12 ta rasm.</p>' +
+      (c.rasmlar.length ? '<div class="catalog-grid">' + c.rasmlar.map(function (x, i) {
+        return '<div class="catalog-thumb"><img src="' + esc(x.url) + '" alt=""><div class="row gap">' +
+          (i > 0 ? '<button class="btn small ghost" data-click="up" data-i="' + i + '" title="Oldinga">↑</button>' : '') +
+          '<button class="btn small danger" data-click="del" data-i="' + i + '" title="Olib tashlash">✕</button></div>' +
+          '<div class="small muted">' + (i + 1) + '-rasm · ' + UI.date(x.yuklangan) + '</div></div>';
+      }).join('') + '</div>' : '<p class="muted">Katalog hali joylanmagan.</p>'), {
+      add: function (el) {
+        var files = Array.prototype.slice.call(el.files || []);
+        if (!files.length) return;
+        var chain = Promise.resolve();
+        files.forEach(function (f) {
+          chain = chain.then(function () {
+            return UI.compressImage(f, 2000).then(function (data) {
+              return UI.api('catalogAdd', { rasm: data, nom: f.name.replace(/\.[^.]+$/, '') });
+            }).then(function (res) { c = res; });
+          });
+        });
+        return chain.then(function () { UI.toast('Katalog yangilandi'); render(box, c); });
+      },
+      up: function (el) { return UI.api('catalogMove', { i: Number(el.dataset.i), yon: 'yuqori' }).then(function (res) { c = res; render(box, c); }); },
+      del: function (el) {
+        return UI.confirm(Number(el.dataset.i) + 1 + '-rasm katalogdan olib tashlansinmi?', 'Olib tashlash', true).then(function (y) {
+          if (y) return UI.api('catalogRemove', { i: Number(el.dataset.i) }).then(function (res) { c = res; render(box, c); });
+        });
+      }
+    });
+  }
+  A.loadCatalogBox = function () {
+    var box = document.getElementById('catalogBox');
+    if (!box) return;
+    UI.api('catalog', {}, { silent: true }).then(function (c) { render(box, c); }).catch(function (e) { box.textContent = e.message; });
   };
 })();

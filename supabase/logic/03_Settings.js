@@ -55,7 +55,7 @@ var SETTING_VALIDATORS = {
   paket_eslatma_kun: 'int', keshbek_eslatma_kun: 'int',
   bayramlar: 'jsonDates', hududlar: 'jsonStrings', kuryer_hudud: 'jsonObj', sherik_ulushlari: 'jsonShares',
   reja: 'jsonPairs', dam_kunlari: 'weekdays', bizning_xato_qoida: 'faultRule',
-  ishga_tushish_sana: 'dateOpt'
+  ishga_tushish_sana: 'dateOpt', katalog: 'jsonList'
 };
 
 function validateSetting_(key, value) {
@@ -91,6 +91,7 @@ function validateSetting_(key, value) {
       var total = sum_(parsed, function (p) { return p.foiz; });
       if (Math.abs(total - 100) > 0.01) fail('Sheriklar ulushi yig\'indisi 100% bo\'lishi kerak');
     }
+    if (kind === 'jsonList' && !Array.isArray(parsed)) fail(key + ': ro\'yxat kerak');
     if (kind === 'jsonPairs' && !(Array.isArray(parsed) && parsed.every(function (p) { return Array.isArray(p) && p.length === 2; }))) fail(key + ': [[kun, son], ...] kerak');
     return JSON.stringify(parsed);
   }
