@@ -136,11 +136,24 @@
 
   function main() { return document.getElementById('main'); }
 
+  /**
+   * Scroll: yangi sahifaga o'tganda tepaga; reload() da avvalgi joyiga;
+   * shu sahifaning o'zi qayta chizilganda (tugma bosilganda) joyida qoladi.
+   */
+  var pendingScroll = null;
   function view(html, actions) {
     var m = main();
+    var y = window.scrollY;
     mount(m, html, actions);
-    window.scrollTo(0, 0);
+    window.scrollTo(0, pendingScroll === null ? y : pendingScroll);
+    pendingScroll = null;
     return m;
+  }
+
+  /** Joriy sahifani qayta yuklaydi, scroll joyi saqlanadi. */
+  function reload() {
+    pendingScroll = window.scrollY;
+    dispatch();
   }
 
   function loadingView() {
@@ -267,6 +280,7 @@
   }
 
   function dispatch() {
+    if (pendingScroll === null) pendingScroll = 0;
     var h = parseHash();
     current = h.path;
     for (var i = 0; i < routes.length; i++) {
@@ -375,7 +389,7 @@
     addDays: addDays, today: todayTashkent, api: api, ApiError: ApiError, toast: toast, errToast: errToast, haptic: haptic,
     mount: mount, bindActions: bindActions, view: view, loadingView: loadingView, errorView: errorView, sheet: sheet,
     confirm: confirmBox, formData: formData, compressImage: compressImage, copyText: copyText, openLink: openLink,
-    route: route, go: go, start: start, setNav: setNav, parseHash: parseHash, reload: dispatch,
+    route: route, go: go, start: start, setNav: setNav, parseHash: parseHash, reload: reload,
     statusBadge: statusBadge, empty: empty, progress: progress, field: field, options: options, calendar: calendar,
     applyTheme: applyTheme, initData: initData
   };

@@ -78,7 +78,10 @@
     {
       id: 'kaloriya', icon: '🎯', title: 'Kaloriya tavsiyasi va vazn statistikasi',
       body: '<p>Mijoz ilovada <b>"🎯 Kaloriya va vazn"</b> bo\'limida jinsi, tug\'ilgan yili, bo\'yi, vazni, maqsadi (ozish / saqlash / vazn olish) va turmush tarzini (ofis / o\'rtacha / sport) kiritadi. ' +
-        'Ilova kunlik kaloriya ehtiyojini hisoblaydi va <b>eng yaqin kaloriyali variantni</b> tavsiya qiladi. Mijoz boshqa variantni ham tanlashi mumkin.</p>' +
+        'Ozish yoki vazn olishni tanlasa, <b>usulini</b> ham tanlaydi: <b>yengil</b> (haftasiga ~0,25 kg), <b>o\'rtacha</b> (~0,5 kg), <b>tez</b> (~0,75 kg). ' +
+        'Ilova kunlik sarfni hisoblaydi (Mifflin–San Jeor formulasi), usulga qarab kaloriyani kamaytiradi yoki ko\'paytiradi (1 kg ≈ 7700 kkal) va <b>eng yaqin kaloriyali variantni</b> tavsiya qiladi.</p>' +
+        '<p><b>📈 Prognoz</b> grafigida 1, 3 va 6 oyda vazn qancha bo\'lishi ko\'rinadi (masalan "3 oyda — 13-yanvargacha ~88 kg"). ' +
+        'Ozishda kuniga erkakka 1500, ayolga 1200 kkal dan kam tavsiya qilinmaydi va prognoz me\'yordan (tana massasi indeksi 18,5) pastga tushmaydi.</p>' +
         '<p>Faol buyurtmasi bor mijozdan bot har <b>15 kunda</b> vaznini so\'raydi (muddatni ' + link('settings', 'Sozlamalar') + ' → Buyurtma qoidalari da o\'zgartirasiz). ' +
         'Natijalar: ' + link('weights', 'Vazn statistikasi') + ' va mijoz kartasida.</p>'
     },

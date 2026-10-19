@@ -27,7 +27,7 @@ var SCHEMA = {
     ['royxatdan_sana', 'd'], ['holat', 's'], ['izoh', 's'], ['til', 's'],
     ['rozilik_vaqt', 't'], ['telefon_sorov', 's'], ['kim_yaratdi', 's'], ['faol', 'b'],
     ['jins', 's'], ['tugilgan_yil', 'n'], ['boy', 'n'], ['vazn', 'f'], ['maqsad', 's'], ['faollik', 's'],
-    ['vazn_soralgan', 'd']
+    ['vazn_soralgan', 'd'], ['usul', 's']
   ],
   Manzillar: [
     ['id', 's'], ['mijoz_id', 's'], ['nom', 's'], ['lat', 'g'], ['lng', 'g'], ['matn', 's'],

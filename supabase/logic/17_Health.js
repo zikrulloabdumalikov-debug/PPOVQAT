@@ -1,15 +1,26 @@
 /**
- * Kaloriya tavsiyasi va vazn statistikasi.
+ * Kaloriya tavsiyasi, vazn prognozi va vazn statistikasi.
  *
- * Mijoz jinsi, yoshi, bo'yi, vazni, maqsadi va turmush tarzini kiritadi →
- * kunlik kaloriya ehtiyoji hisoblanadi (Mifflin–San Jeor formulasi) va unga eng yaqin ratsion tavsiya qilinadi.
+ * Mijoz jinsi, yoshi, bo'yi, vazni, maqsadi (va usuli) hamda turmush tarzini kiritadi →
+ *   1) kunlik sarf: Mifflin–San Jeor formulasi × turmush tarzi koeffitsienti;
+ *   2) ozish/vazn olishda usul (yengil/o'rtacha/tez) haftasiga necha kg o'zgarishni belgilaydi:
+ *      1 kg ≈ 7700 kkal, ya'ni haftasiga 0,5 kg uchun kuniga ~550 kkal kam (yoki ko'p);
+ *   3) ozishda kuniga erkak 1500 / ayol 1200 kkal dan kam tavsiya qilinmaydi (sur'at shunga moslanadi);
+ *   4) unga eng yaqin kaloriyali ratsion tavsiya qilinadi va oylar bo'yicha vazn prognozi chiziladi.
  * Vazn har o'zgarganda VaznTarix ga yoziladi (bir kunda bitta yozuv), har 15 kunda bot qayta so'raydi.
  */
 
 var GOALS = {
-  ozish: { nom: 'Ozmoqchiman', k: 0.8 },
-  saqlash: { nom: 'Vaznimni saqlamoqchiman', k: 1 },
-  vazn_olish: { nom: 'Vazn olmoqchiman', k: 1.15 }
+  ozish: { nom: 'Ozmoqchiman', ishora: -1 },
+  saqlash: { nom: 'Vaznimni saqlamoqchiman', ishora: 0 },
+  vazn_olish: { nom: 'Vazn olmoqchiman', ishora: 1 }
+};
+
+/** Usul = haftasiga necha kg o'zgarish. */
+var METHODS = {
+  yengil: { nom: 'Yengil', kg: 0.25 },
+  ortacha: { nom: 'O\'rtacha', kg: 0.5 },
+  tez: { nom: 'Tez', kg: 0.75 }
 };
 
 var ACTIVITY = {
@@ -18,15 +29,107 @@ var ACTIVITY = {
   sport: { nom: 'Faol (haftada 4+ marta shug\'ullanaman)', k: 1.55 }
 };
 
+var KCAL_PER_KG = 7700;
+var MIN_KCAL = { erkak: 1500, ayol: 1200 };
+var MIN_BMI = 18.5;
+
+function hasMethod_(maqsad) { return maqsad === 'ozish' || maqsad === 'vazn_olish'; }
+
+/** Mijoz usuli (eski yozuvlarda bo'lmasa — o'rtacha). */
+function methodOf_(c) {
+  if (!hasMethod_(c.maqsad)) return '';
+  return METHODS[c.usul] ? c.usul : 'ortacha';
+}
+
+function methodLabel_(maqsad, key) {
+  var m = METHODS[key];
+  if (!m || !hasMethod_(maqsad)) return '';
+  var kcal = Math.round(m.kg * KCAL_PER_KG / 7 / 5) * 5;
+  return m.nom + ' — haftasiga ~' + String(m.kg).replace('.', ',') + ' kg (kuniga ~' + kcal + ' kkal ' +
+    (maqsad === 'ozish' ? 'kam' : 'ko\'p') + ')';
+}
+
+function goalLabel_(c) {
+  var g = GOALS[c.maqsad];
+  if (!g) return '';
+  var m = methodOf_(c);
+  return g.nom + (m ? ' (' + METHODS[m].nom.toLowerCase() + ')' : '');
+}
+
 function healthComplete_(c) {
   return !!(c.jins && c.tugilgan_yil && c.boy && c.vazn && GOALS[c.maqsad] && ACTIVITY[c.faollik]);
 }
 
-/** Kunlik kaloriya ehtiyoji (kkal). */
-function dailyKcal_(c) {
+/**
+ * Kunlik reja: { sarf (kunlik sarf), kkal (tavsiya), hafta_kg (+/−), chegaralandi }.
+ * hafta_kg — kkal farqidan kelib chiqadi, shuning uchun chegara qo'llansa sur'at ham kamayadi.
+ */
+function dailyPlan_(c) {
   var age = Number(today_().slice(0, 4)) - c.tugilgan_yil;
   var bmr = 10 * c.vazn + 6.25 * c.boy - 5 * age + (c.jins === 'erkak' ? 5 : -161);
-  return Math.round(bmr * ACTIVITY[c.faollik].k * GOALS[c.maqsad].k / 10) * 10;
+  var sarf = bmr * ACTIVITY[c.faollik].k;
+  var g = GOALS[c.maqsad];
+  var m = methodOf_(c);
+  var kcal = sarf + (m ? g.ishora * METHODS[m].kg * KCAL_PER_KG / 7 : 0);
+  var min = MIN_KCAL[c.jins] || 1200;
+  var capped = false;
+  if (c.maqsad === 'ozish' && kcal < min) { kcal = min; capped = true; }
+  var week = (kcal - sarf) * 7 / KCAL_PER_KG;
+  if (c.maqsad === 'ozish' && week > 0) week = 0;
+  return {
+    sarf: Math.round(sarf / 10) * 10,
+    kkal: Math.round(kcal / 10) * 10,
+    hafta_kg: Math.round(week * 100) / 100,
+    chegaralandi: capped,
+    min_kkal: min
+  };
+}
+
+/** Kunlik kaloriya tavsiyasi (kkal). */
+function dailyKcal_(c) {
+  return dailyPlan_(c).kkal;
+}
+
+/** Sanaga n oy qo'shish (31-yanvar + 1 oy = 28/29-fevral). */
+function addMonthsDate_(date, n) {
+  var ym = addMonths_(date.slice(0, 7), n);
+  var day = Math.min(Number(date.slice(8, 10)), daysInMonth_(ym));
+  return ym + '-' + ('0' + day).slice(-2);
+}
+
+/**
+ * Vazn prognozi: bugundan boshlab haftalik nuqtalar (6 oygacha) va 1/2/3/6 oylik natijalar.
+ * Ozishda prognoz sog'lom chegaradan (BMI 18,5) pastga tushmaydi.
+ */
+function weightForecast_(c, plan) {
+  var start = today_();
+  var w0 = c.vazn;
+  var floor = c.maqsad === 'ozish' ? Math.round(MIN_BMI * Math.pow(c.boy / 100, 2) * 10) / 10 : 0;
+  var at = function (date) {
+    var w = w0 + plan.hafta_kg * diffDays_(start, date) / 7;
+    if (floor && w < floor) w = Math.min(w0, floor);
+    return Math.round(w * 10) / 10;
+  };
+  var end = addMonthsDate_(start, 6);
+  var points = [];
+  for (var d = start; d < end; d = addDays_(d, 7)) points.push({ sana: d, vazn: at(d) });
+  points.push({ sana: end, vazn: at(end) });
+  return {
+    boshlanish: start,
+    vazn: w0,
+    chegara_vazn: floor,
+    nuqtalar: points,
+    oylar: [1, 2, 3, 6].map(function (n) {
+      var d2 = addMonthsDate_(start, n);
+      var v = at(d2);
+      return { oy: n, sana: d2, vazn: v, ozgarish: Math.round((v - w0) * 10) / 10 };
+    })
+  };
+}
+
+function bmiOf_(c) {
+  if (!c.vazn || !c.boy) return 0;
+  return Math.round(c.vazn / Math.pow(c.boy / 100, 2) * 10) / 10;
 }
 
 /** Ehtiyojga eng yaqin kaloriyali faol (narxi bor) ratsion. */
@@ -75,20 +178,37 @@ function weightSummary_(hist) {
 function healthView_(c) {
   var hist = weightHistory_(c.id);
   var done = healthComplete_(c);
-  var kcal = done ? dailyKcal_(c) : 0;
+  var plan = done ? dailyPlan_(c) : null;
+  var bmi = bmiOf_(c);
+  var warn = '';
+  if (done && c.maqsad === 'ozish' && bmi && bmi < MIN_BMI) {
+    warn = 'Vazningiz me\'yorning pastki chegarasida (tana massasi indeksi ' + bmi + '). Ozish tavsiya qilinmaydi — "Vaznimni saqlamoqchiman" ni tanlang yoki shifokor bilan maslahatlashing.';
+  } else if (plan && plan.chegaralandi) {
+    warn = 'Sog\'liq uchun kuniga ' + plan.min_kkal + ' kkal dan kam tavsiya qilinmaydi, shuning uchun sur\'at haftasiga ~' +
+      String(Math.abs(plan.hafta_kg)).replace('.', ',') + ' kg.';
+  }
   return {
     profil: {
       jins: c.jins, tugilgan_yil: c.tugilgan_yil || '', boy: c.boy || '', vazn: c.vazn || '',
-      maqsad: c.maqsad, faollik: c.faollik
+      maqsad: c.maqsad, usul: methodOf_(c), faollik: c.faollik
     },
     toliq: done,
-    kkal: kcal,
-    tavsiya: done ? recommendRation_(kcal) : null,
+    kkal: plan ? plan.kkal : 0,
+    reja: plan,
+    bmi: bmi,
+    ogohlantirish: warn,
+    maqsad_nomi: goalLabel_(c),
+    prognoz: plan && hasMethod_(c.maqsad) ? weightForecast_(c, plan) : null,
+    tavsiya: done ? recommendRation_(plan.kkal) : null,
     tarix: hist.slice(-60).map(function (w) { return { sana: w.sana, vazn: w.vazn }; }),
     statistika: weightSummary_(hist),
     sorash_kerak: weightDue_(c, hist),
     sorash_kun: settingNum_('vazn_sorash_kun') || 15,
     maqsadlar: Object.keys(GOALS).map(function (k) { return { value: k, label: GOALS[k].nom }; }),
+    usullar: {
+      ozish: Object.keys(METHODS).map(function (k) { return { value: k, label: methodLabel_('ozish', k) }; }),
+      vazn_olish: Object.keys(METHODS).map(function (k) { return { value: k, label: methodLabel_('vazn_olish', k) }; })
+    },
     faolliklar: Object.keys(ACTIVITY).map(function (k) { return { value: k, label: ACTIVITY[k].nom }; })
   };
 }
@@ -124,6 +244,13 @@ function healthSave_(ctx, c, p) {
     if (!GOALS[p.maqsad]) fail('Maqsadni tanlang');
     patch.maqsad = p.maqsad;
   }
+  var goal = patch.maqsad || c.maqsad;
+  if (p.usul !== undefined && p.usul !== '' && hasMethod_(goal)) {
+    if (!METHODS[p.usul]) fail('Usulni tanlang');
+    patch.usul = p.usul;
+  }
+  if (patch.maqsad && !hasMethod_(patch.maqsad)) patch.usul = '';
+  if (patch.maqsad && hasMethod_(patch.maqsad) && !patch.usul && !METHODS[c.usul]) patch.usul = 'ortacha';
   if (p.faollik !== undefined) {
     if (!ACTIVITY[p.faollik]) fail('Turmush tarzini tanlang');
     patch.faollik = p.faollik;
@@ -165,7 +292,7 @@ function weightStats_() {
     if (!c || !c.faol) return;
     var s = weightSummary_(byClient[cid].sort(function (a, b) { return a.sana < b.sana ? -1 : 1; }));
     items.push({
-      mijoz_id: cid, ism: c.ism, maqsad: (GOALS[c.maqsad] || {}).nom || '',
+      mijoz_id: cid, ism: c.ism, maqsad: goalLabel_(c),
       boshlangich: s.boshlangich, boshlangich_sana: s.boshlangich_sana,
       joriy: s.joriy, joriy_sana: s.joriy_sana, ozgarish: s.ozgarish, olchovlar: byClient[cid].length
     });

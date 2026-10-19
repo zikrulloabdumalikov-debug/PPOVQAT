@@ -58,13 +58,20 @@ test('Kaloriya tavsiyasi: bo\'y, vazn, maqsad va turmush tarziga qarab eng mos r
   assert.equal((await env.api(env.IDS.clientA, 'healthSave', { vazn: 10 })).ok, false);
   assert.equal((await env.api(env.IDS.clientA, 'healthSave', { maqsad: 'yoq' })).ok, false);
 
-  // ayol, 36 yosh, 165 sm, 80 kg, ozish, ofis → ~1430 kkal → 1500–1600 eng yaqin (1200 dan)
+  // ayol, 36 yosh, 165 sm, 80,5 kg, ofis: sarf ≈ 1794; ozish yengil (−275) → 1520 → 1500–1600 eng yaqin
   h = await env.ok(env.IDS.clientA, 'healthSave', {
-    jins: 'ayol', tugilgan_yil: 1990, boy: 165, vazn: '80,5', maqsad: 'ozish', faollik: 'ofis'
+    jins: 'ayol', tugilgan_yil: 1990, boy: 165, vazn: '80,5', maqsad: 'ozish', usul: 'yengil', faollik: 'ofis'
   });
   assert.equal(h.toliq, true);
   assert.equal(h.profil.vazn, 80.5);
-  assert.equal(h.kkal, 1440);
+  assert.equal(h.profil.usul, 'yengil');
+  assert.equal(h.reja.sarf, 1790);
+  assert.equal(h.kkal, 1520);
+  assert.equal(h.reja.hafta_kg, -0.25);
+  // o'rtacha usul (standart) → 1240 → 1200 lik ratsion
+  assert.equal((await env.ok(env.IDS.clientA, 'healthSave', { usul: 'ortacha' })).kkal, 1240);
+  assert.equal((await env.api(env.IDS.clientA, 'healthSave', { usul: 'juda_tez' })).ok, false);
+  h = await env.ok(env.IDS.clientA, 'healthSave', { usul: 'yengil' });
   assert.equal(h.tavsiya.ratsion_id, r2.id);
   assert.equal(h.tavsiya.kunlik_narx, 155000);
 
@@ -144,6 +151,55 @@ test('Sozlanmagan ilova: admin ogohlantiriladi, tavsiya bo\'lmasa ham kaloriya k
   assert.equal(t.sozlash.ratsion, 0);
   const h = await env.ok(env.IDS.clientA, 'healthSave', { jins: 'erkak', tugilgan_yil: 2004, boy: 182, vazn: 65, maqsad: 'vazn_olish', faollik: 'ofis' });
   assert.equal(h.toliq, true);
-  assert.equal(h.kkal, 2320);
+  assert.equal(h.kkal, 2570, 'vazn olish, usul berilmasa — o\'rtacha (+550)');
+  assert.equal(h.profil.usul, 'ortacha');
   assert.equal(h.tavsiya, null);
+});
+
+test('Usul va prognoz: 3 oyda qancha kg, xavfsiz chegara, saqlashda usul yo\'q', async () => {
+  const env = await makeEnv();
+  // erkak, 22 yosh, 182 sm, 150 kg, ofis, ozish tez: sarf 3039 − 825 → 2210 kkal, haftasiga −0,75 kg
+  let h = await env.ok(env.IDS.clientA, 'healthSave', {
+    jins: 'erkak', tugilgan_yil: 2004, boy: 182, vazn: 150, maqsad: 'ozish', usul: 'tez', faollik: 'ofis'
+  });
+  assert.equal(h.kkal, 2210);
+  assert.equal(h.reja.hafta_kg, -0.75);
+  assert.equal(h.reja.chegaralandi, false);
+  assert.equal(h.maqsad_nomi, 'Ozmoqchiman (tez)');
+  const m3 = h.prognoz.oylar.find((x) => x.oy === 3);
+  assert.equal(m3.sana, '2027-01-13');
+  assert.equal(m3.vazn, 140.1); // 150 − 0,75 × 92/7
+  assert.equal(h.prognoz.nuqtalar[0].vazn, 150);
+  assert.equal(h.prognoz.nuqtalar.at(-1).sana, '2027-04-13');
+  assert.equal(h.usullar.ozish.length, 3);
+  assert.match(h.usullar.ozish[1].label, /0,5 kg/);
+
+  // vazn olish
+  h = await env.ok(env.IDS.clientA, 'healthSave', { maqsad: 'vazn_olish', usul: 'yengil', vazn: 60 });
+  assert.equal(h.reja.hafta_kg, 0.25);
+  assert.ok(h.prognoz.oylar.find((x) => x.oy === 3).vazn > 63);
+
+  // saqlash: usul yo'q, prognoz yo'q
+  h = await env.ok(env.IDS.clientA, 'healthSave', { maqsad: 'saqlash' });
+  assert.equal(h.profil.usul, '');
+  assert.equal(h.prognoz, null);
+  assert.equal(h.reja.hafta_kg, 0);
+
+  // ayol, 160 sm, 50 kg, ozish tez: 566 kkal chiqadi → 1200 dan kam emas, sur'at kamayadi, BMI 18,5 dan pastga tushmaydi
+  h = await env.ok(env.IDS.clientB, 'healthSave', {
+    jins: 'ayol', tugilgan_yil: 1990, boy: 160, vazn: 50, maqsad: 'ozish', usul: 'tez', faollik: 'ofis'
+  });
+  assert.equal(h.kkal, 1200);
+  assert.equal(h.reja.chegaralandi, true);
+  assert.equal(h.reja.hafta_kg, -0.17);
+  assert.match(h.ogohlantirish, /1200 kkal/);
+  assert.equal(h.prognoz.chegara_vazn, 47.4);
+  assert.ok(h.prognoz.nuqtalar.every((x) => x.vazn >= 47.4));
+  // juda past vazn — ozish tavsiya qilinmaydi
+  h = await env.ok(env.IDS.clientB, 'healthSave', { vazn: 45 });
+  assert.match(h.ogohlantirish, /Ozish tavsiya qilinmaydi/);
+
+  // admin kartasida usul ko'rinadi
+  const st = await env.ok(env.IDS.operator, 'weightStats');
+  assert.ok(st.items.some((x) => x.maqsad === 'Ozmoqchiman (tez)'));
 });

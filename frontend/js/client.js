@@ -447,37 +447,98 @@
     });
   }
 
-  // ---------- Salomatlik: kaloriya tavsiyasi va vazn ----------
-  function weightChart(tarix) {
-    if (tarix.length < 2) return '';
-    var w = 300, h = 90, pad = 8;
-    var vals = tarix.map(function (x) { return x.vazn; });
-    var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
-    if (max === min) { max += 1; min -= 1; }
-    var pts = vals.map(function (v, i) {
-      var x = pad + i * (w - 2 * pad) / (vals.length - 1);
-      var y = pad + (max - v) * (h - 2 * pad) / (max - min);
-      return x.toFixed(1) + ',' + y.toFixed(1);
-    }).join(' ');
-    return '<svg class="weight-chart" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none"><polyline points="' + pts + '" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>';
+  // ---------- Salomatlik: kaloriya tavsiyasi, prognoz va vazn ----------
+  function kg(v) { return String(Math.round(v * 10) / 10).replace('.', ','); }
+  function signedKg(v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + kg(Math.abs(v)); }
+  function dayNum(sana) { return Date.parse(sana + 'T00:00:00Z') / 86400000; }
+
+  /** Vazn grafigi: o'tgan o'lchovlar (to'liq chiziq) va prognoz (uzuq chiziq) oylar bo'yicha. */
+  function forecastChart(tarix, prognoz, months) {
+    var W = 340, H = 210, L = 40, R = 14, T = 16, B = 30;
+    var fc = prognoz ? prognoz.nuqtalar : [];
+    var marks = prognoz ? prognoz.oylar.filter(function (m) { return m.oy <= months; }) : [];
+    var endSana = marks.length ? marks[marks.length - 1].sana : null;
+    if (endSana) fc = fc.filter(function (x) { return x.sana < endSana; }).concat([{ sana: endSana, vazn: marks[marks.length - 1].vazn }]);
+    var start = prognoz ? prognoz.boshlanish : (tarix.length ? tarix[tarix.length - 1].sana : null);
+    var from = start ? dayNum(start) - months * 31 : 0;
+    var hist = tarix.filter(function (x) { return dayNum(x.sana) >= from; });
+    var all = hist.concat(fc);
+    if (all.length < 2) return '';
+    var xs = all.map(function (x) { return dayNum(x.sana); });
+    var vs = all.map(function (x) { return x.vazn; });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+    var v0 = Math.min.apply(null, vs), v1 = Math.max.apply(null, vs);
+    var step = [1, 2, 5, 10, 20, 50].filter(function (st) { return st >= (v1 - v0 + 1) / 4; })[0] || 50;
+    v0 = Math.floor((v0 - step * 0.3) / step) * step; v1 = Math.ceil((v1 + step * 0.3) / step) * step;
+    if (x1 === x0) x1 = x0 + 1;
+    var X = function (d) { return L + (dayNum(d) - x0) * (W - L - R) / (x1 - x0); };
+    var Y = function (v) { return T + (v1 - v) * (H - T - B) / (v1 - v0); };
+    var line = function (pts) { return pts.map(function (p) { return X(p.sana).toFixed(1) + ',' + Y(p.vazn).toFixed(1); }).join(' '); };
+    var svg = '<svg class="fc-chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Vazn prognozi">';
+    for (var v = v0; v <= v1 + 0.001; v += step) {
+      var y = Y(v);
+      svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '" class="fc-grid"/>' +
+        '<text x="' + (L - 6) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" class="fc-lbl">' + Math.round(v) + '</text>';
+    }
+    if (start && prognoz) {
+      svg += '<line x1="' + X(start).toFixed(1) + '" x2="' + X(start).toFixed(1) + '" y1="' + T + '" y2="' + (H - B) + '" class="fc-today"/>' +
+        '<text x="' + X(start).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="fc-lbl">Bugun</text>';
+    }
+    marks.forEach(function (m) {
+      var x = X(m.sana).toFixed(1);
+      svg += '<line x1="' + x + '" x2="' + x + '" y1="' + T + '" y2="' + (H - B) + '" class="fc-grid"/>' +
+        '<text x="' + x + '" y="' + (H - 10) + '" text-anchor="' + (m === marks[marks.length - 1] ? 'end' : 'middle') + '" class="fc-lbl">' + esc(UI.dateShort(m.sana)) + '</text>';
+    });
+    if (hist.length > 1) svg += '<polyline points="' + line(hist) + '" class="fc-hist"/>';
+    hist.forEach(function (p) { svg += '<circle cx="' + X(p.sana).toFixed(1) + '" cy="' + Y(p.vazn).toFixed(1) + '" r="3" class="fc-hist-dot"/>'; });
+    if (fc.length > 1) {
+      svg += '<polyline points="' + line(fc) + '" class="fc-plan"/>';
+      var last = fc[fc.length - 1];
+      var lx = X(last.sana), ly = Y(last.vazn);
+      svg += '<circle cx="' + lx.toFixed(1) + '" cy="' + ly.toFixed(1) + '" r="5" class="fc-end"/>' +
+        '<text x="' + (lx - 8).toFixed(1) + '" y="' + (ly + (ly < T + 20 ? 18 : -10)).toFixed(1) + '" text-anchor="end" class="fc-end-lbl">' + kg(last.vazn) + ' kg</text>';
+    }
+    return svg + '</svg>' +
+      '<div class="fc-legend small muted">' + (hist.length ? '<span><i class="lg-hist"></i>O\'lchangan</span>' : '') +
+      (fc.length > 1 ? '<span><i class="lg-plan"></i>Prognoz</span>' : '') + '</div>';
+  }
+
+  function methodsBox(hv, maqsad, usul) {
+    var list = hv.usullar[maqsad];
+    if (!list) return '';
+    var cur = usul || 'ortacha';
+    return '<div class="field"><span class="field-label">' + (maqsad === 'ozish' ? 'Ozish usuli' : 'Vazn olish usuli') + '</span><div class="list">' +
+      list.map(function (u) {
+        return '<label class="list-item"><input type="radio" name="usul" value="' + esc(u.value) + '"' + (u.value === cur ? ' checked' : '') + '>' +
+          '<div class="grow small">' + esc(u.label) + '</div></label>';
+      }).join('') + '</div></div>';
   }
 
   function healthPage(params, query) {
     return api('health').then(function (hv) {
       var p = hv.profil;
       var year = new Date().getFullYear();
+      var months = 3;
       var html = '<h1>🎯 Kaloriya va vazn</h1>';
       if (query.yangi) html += '<div class="card ok">✅ Ro\'yxatdan o\'tdingiz! Endi o\'zingizga mos kaloriyani bilib oling (ixtiyoriy).</div>';
-      if (hv.toliq && !hv.tavsiya) {
-        html += '<div class="card accent"><div class="muted small">Kunlik ehtiyojingiz taxminan</div><div class="big">' + UI.money(hv.kkal) + ' kkal</div>' +
-          '<p class="small muted">Kaloriya variantlari hali kiritilmagan, shuning uchun mos variantni ko\'rsata olmadik. Tez orada qo\'shiladi.</p></div>';
-      }
-      if (hv.toliq && hv.tavsiya) {
-        html += '<div class="card accent"><div class="muted small">Kunlik ehtiyojingiz taxminan</div><div class="big">' + UI.money(hv.kkal) + ' kkal</div>' +
-          '<div class="mt">Sizga mos variant: <b>' + esc(hv.tavsiya.ratsion) + '</b>' + (hv.tavsiya.kaloriya ? ' (' + esc(hv.tavsiya.kaloriya) + ' kkal)' : '') +
-          ' — kuniga ' + som(hv.tavsiya.kunlik_narx) + '</div>' +
-          '<a class="btn block mt" href="#/order?ratsion=' + esc(hv.tavsiya.ratsion_id) + '">Shu variantni tanlash</a>' +
+      if (hv.toliq) {
+        html += '<div class="card accent"><div class="muted small">Sizga kuniga taxminan</div><div class="big">' + UI.money(hv.kkal) + ' kkal</div>' +
+          '<div class="small muted">' + esc(hv.maqsad_nomi) + ' · kunlik sarfingiz ~' + UI.money(hv.reja.sarf) + ' kkal</div>' +
+          (hv.tavsiya ? '<div class="mt">Sizga mos variant: <b>' + esc(hv.tavsiya.ratsion) + '</b>' + (hv.tavsiya.kaloriya ? ' (' + esc(hv.tavsiya.kaloriya) + ' kkal)' : '') +
+            ' — kuniga ' + som(hv.tavsiya.kunlik_narx) + '</div>' +
+            '<a class="btn block mt" href="#/order?ratsion=' + esc(hv.tavsiya.ratsion_id) + '">Shu variantni tanlash</a>' :
+            '<p class="small muted">Kaloriya variantlari hali kiritilmagan, shuning uchun mos variantni ko\'rsata olmadik.</p>') +
           '<p class="hint">Tavsiya taxminiy. Boshqa variantni ham tanlashingiz mumkin.</p></div>';
+        if (hv.ogohlantirish) html += '<div class="card warn small">⚠️ ' + esc(hv.ogohlantirish) + '</div>';
+        if (hv.prognoz) {
+          html += '<div class="card"><div class="row between wrap"><h3>📈 Prognoz</h3><div class="chips" id="fcMonths">' + [1, 3, 6].map(function (n) {
+            return '<button class="chip-btn small' + (n === months ? ' on' : '') + '" data-click="months" data-n="' + n + '">' + n + ' oy</button>';
+          }).join('') + '</div></div><div id="fcBox"></div>' +
+            '<p class="hint">Rejaga amal qilsangiz (kuniga ~' + UI.money(hv.kkal) + ' kkal), vazningiz haftasiga ~' + kg(Math.abs(hv.reja.hafta_kg)) + ' kg ' +
+            (hv.reja.hafta_kg < 0 ? 'kamayadi' : 'ortadi') + '. Har ' + hv.sorash_kun + ' kunda vazningizni kiriting — haqiqiy natija grafikda ko\'rinadi.</p></div>';
+        } else if (p.maqsad === 'saqlash') {
+          html += '<div class="card small">⚖️ Kuniga ~' + UI.money(hv.kkal) + ' kkal bilan vazningiz ~' + kg(p.vazn) + ' kg atrofida saqlanadi.</div>';
+        }
       }
       if (p.vazn) {
         var stt = hv.statistika;
@@ -485,12 +546,12 @@
           (hv.sorash_kerak ? '<p>' + hv.sorash_kun + ' kun o\'tdi — bugungi vazningizni kiriting.</p>' : '') +
           '<form class="row gap" data-submit="weight"><input name="vazn" type="number" step="0.1" min="30" max="300" inputmode="decimal" class="grow" placeholder="Bugungi vazn, kg" required>' +
           '<button class="btn">Saqlash</button></form>' +
-          (stt ? '<div class="grid2 mt"><div><div class="muted small">Boshida (' + UI.date(stt.boshlangich_sana) + ')</div><b>' + stt.boshlangich + ' kg</b></div>' +
-            '<div><div class="muted small">Hozir (' + UI.date(stt.joriy_sana) + ')</div><b>' + stt.joriy + ' kg</b></div></div>' +
-            (stt.ozgarish ? '<div class="mt ' + (stt.ozgarish < 0 ? 'save' : '') + '"><b>' + (stt.ozgarish < 0 ? '📉 ' : '📈 ') + (stt.ozgarish > 0 ? '+' : '') + stt.ozgarish + ' kg</b></div>' : '') : '') +
-          weightChart(hv.tarix) +
+          (stt ? '<div class="grid2 mt"><div><div class="muted small">Boshida (' + UI.date(stt.boshlangich_sana) + ')</div><b>' + kg(stt.boshlangich) + ' kg</b></div>' +
+            '<div><div class="muted small">Hozir (' + UI.date(stt.joriy_sana) + ')</div><b>' + kg(stt.joriy) + ' kg</b></div></div>' +
+            (stt.ozgarish ? '<div class="mt ' + (stt.ozgarish < 0 ? 'save' : '') + '"><b>' + (stt.ozgarish < 0 ? '📉 ' : '📈 ') + signedKg(stt.ozgarish) + ' kg</b></div>' : '') : '') +
+          (!hv.prognoz ? forecastChart(hv.tarix, null, 6) : '') +
           (hv.tarix.length > 1 ? '<details class="mt"><summary class="small">Tarix</summary>' + hv.tarix.slice().reverse().map(function (x) {
-            return '<div class="row between small"><span>' + UI.date(x.sana) + '</span><b>' + x.vazn + ' kg</b></div>';
+            return '<div class="row between small"><span>' + UI.date(x.sana) + '</span><b>' + kg(x.vazn) + ' kg</b></div>';
           }).join('') + '</details>' : '') + '</div>';
       }
       html += '<form class="card stack" data-submit="save"><h3>' + (hv.toliq ? 'Ma\'lumotlarim' : 'Ma\'lumotlaringizni kiriting') + '</h3>' +
@@ -503,12 +564,32 @@
         UI.field('Bo\'y, sm', '<input name="boy" type="number" inputmode="numeric" min="100" max="230" value="' + esc(p.boy) + '" placeholder="170" required>') +
         '</div>' +
         UI.field('Vazn, kg', '<input name="vazn" type="number" step="0.1" inputmode="decimal" min="30" max="300" value="' + esc(p.vazn) + '" placeholder="75" required>') +
-        UI.field('Maqsadingiz', '<select name="maqsad" required>' + UI.options(hv.maqsadlar, p.maqsad, { empty: 'Tanlang' }) + '</select>') +
+        UI.field('Maqsadingiz', '<select name="maqsad" data-change="goal" required>' + UI.options(hv.maqsadlar, p.maqsad, { empty: 'Tanlang' }) + '</select>') +
+        '<div id="methodBox">' + methodsBox(hv, p.maqsad, p.usul) + '</div>' +
         UI.field('Turmush tarzingiz', '<select name="faollik" required>' + UI.options(hv.faolliklar, p.faollik, { empty: 'Tanlang' }) + '</select>') +
         '<button class="btn block">' + (hv.toliq ? 'Saqlash' : 'Tavsiya olish') + '</button>' +
-        '<p class="hint">Har ' + hv.sorash_kun + ' kunda vazningizni so\'raymiz — natijangizni (ozish yoki vazn olish) kuzatib borasiz. Maqsad va vaznni istalgan payt shu yerda o\'zgartirasiz.</p></form>';
+        '<p class="hint">Har ' + hv.sorash_kun + ' kunda vazningizni so\'raymiz — natijangizni kuzatib borasiz. Maqsad, usul va vaznni istalgan payt shu yerda o\'zgartirasiz.</p></form>';
       if (query.yangi) html += '<a class="btn ghost block" href="#/order">Keyinroq — buyurtma berish</a>';
+
+      var drawForecast = function () {
+        var box = document.getElementById('fcBox');
+        if (!box || !hv.prognoz) return;
+        var m = hv.prognoz.oylar.filter(function (x) { return x.oy === months; })[0];
+        box.innerHTML = '<div class="fc-head">' + m.oy + ' oyda — <b>' + esc(UI.date(m.sana)) + 'gacha</b> ~<b>' + kg(m.vazn) + ' kg</b>' +
+          ' <span class="' + (m.ozgarish < 0 ? 'save' : '') + '">(' + signedKg(m.ozgarish) + ' kg)</span></div>' +
+          forecastChart(hv.tarix, hv.prognoz, months) +
+          '<div class="fc-marks">' + hv.prognoz.oylar.map(function (x) {
+            return '<div class="fc-mark' + (x.oy === months ? ' on' : '') + '"><div class="small muted">' + x.oy + ' oy · ' + esc(UI.dateShort(x.sana)) + '</div><b>' + kg(x.vazn) + ' kg</b>' +
+              '<div class="small ' + (x.ozgarish < 0 ? 'save' : '') + '">' + signedKg(x.ozgarish) + '</div></div>';
+          }).join('') + '</div>';
+      };
       UI.view(html, {
+        months: function (el) {
+          months = Number(el.dataset.n);
+          document.querySelectorAll('#fcMonths .chip-btn').forEach(function (b) { b.classList.toggle('on', b === el); });
+          drawForecast();
+        },
+        goal: function (el) { document.getElementById('methodBox').innerHTML = methodsBox(hv, el.value, p.usul); },
         save: function (form) {
           var d = UI.formData(form);
           if (String(d.vazn) === String(p.vazn)) delete d.vazn; // vazn o'zgarmagan — tarixga yozilmaydi
@@ -518,6 +599,7 @@
           return api('healthSave', { vazn: UI.formData(form).vazn }).then(function () { UI.toast('Vazn saqlandi'); UI.haptic('success'); UI.reload(); });
         }
       });
+      drawForecast();
     });
   }
 

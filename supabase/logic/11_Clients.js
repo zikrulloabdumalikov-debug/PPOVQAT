@@ -302,7 +302,7 @@ function clientDetail_(id) {
       var hv = healthView_(c);
       return {
         toliq: hv.toliq, kkal: hv.kkal, tavsiya: hv.tavsiya, statistika: hv.statistika, tarix: hv.tarix,
-        maqsad: (GOALS[c.maqsad] || {}).nom || '', faollik: (ACTIVITY[c.faollik] || {}).nom || '',
+        maqsad: goalLabel_(c), faollik: (ACTIVITY[c.faollik] || {}).nom || '', prognoz: hv.prognoz, reja: hv.reja,
         boy: c.boy || '', vazn: c.vazn || '', jins: c.jins, tugilgan_yil: c.tugilgan_yil || ''
       };
     })(),

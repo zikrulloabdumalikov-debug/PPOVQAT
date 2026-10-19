@@ -372,7 +372,9 @@
           '<div><div class="muted">Turmush tarzi</div><b>' + esc(sh.faollik || '—') + '</b></div>' +
           '<div><div class="muted">Bo\'y / vazn</div><b>' + (sh.boy || '—') + ' sm / ' + (sh.vazn || '—') + ' kg</b></div>' +
           '<div><div class="muted">Tavsiya</div><b>' + (sh.tavsiya ? esc(sh.tavsiya.ratsion) + ' (' + money(sh.kkal) + ' kkal)' : '—') + '</b></div></div>' +
-          (sh.statistika ? '<div class="mt">Vazn: ' + sh.statistika.boshlangich + ' kg (' + UI.date(sh.statistika.boshlangich_sana) + ') → <b>' + sh.statistika.joriy + ' kg</b> (' +
+          (sh.prognoz ? '<div class="mt">Prognoz: 3 oyda (' + UI.date(sh.prognoz.oylar[2].sana) + ') ~<b>' + sh.prognoz.oylar[2].vazn + ' kg</b> (' +
+            (sh.prognoz.oylar[2].ozgarish > 0 ? '+' : '') + sh.prognoz.oylar[2].ozgarish + ' kg)</div>' : '') +
+          (sh.statistika && sh.statistika.boshlangich_sana !== sh.statistika.joriy_sana ? '<div class="mt">Vazn: ' + sh.statistika.boshlangich + ' kg (' + UI.date(sh.statistika.boshlangich_sana) + ') → <b>' + sh.statistika.joriy + ' kg</b> (' +
             UI.date(sh.statistika.joriy_sana) + ') · <b class="' + (sh.statistika.ozgarish < 0 ? 'save' : '') + '">' + (sh.statistika.ozgarish > 0 ? '+' : '') + sh.statistika.ozgarish + ' kg</b></div>' : '') +
           '</div>';
       }
