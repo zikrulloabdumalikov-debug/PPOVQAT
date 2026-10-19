@@ -64,7 +64,7 @@ haqiqiy Sheets kechikishini faqat joyida o'lchash mumkin.
 
 | Rol | Ko'radi / qiladi |
 |---|---|
-| Mijoz | o'z profili, paket, qolgan kunlar, keshbek, chegirmalar, buyurtma, pauza, manzillar |
+| Mijoz | o'z profili, istalgan kunlik buyurtma (1 kundan 1 yilgacha), narxlar jadvali, 6 kunlik menyu rasmi, kaloriya tavsiyasi va vazn tarixi, qolgan kunlar, keshbek, pauza, manzillar |
 | Sherik (admin) | hammasi: xarajat, oylik, dashboard, narx, sozlamalar, foydalanuvchilar, audit |
 | Operator | bugun, buyurtmalar (to'lov tasdiqlash), mijozlar, menyu, yetkazish — moliyasiz |
 | Kuryer | faqat o'ziga biriktirilgan bugungi yetkazishlar: ism, telefon, manzil, mo'ljal, ratsion |

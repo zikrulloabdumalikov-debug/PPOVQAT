@@ -133,11 +133,12 @@ function clientHome_(client) {
       return { id: v.id, ratsion: v.ratsion, kunlar: v.kunlar, tolanadi: v.tolanadi, tolangan: v.tolangan,
         narx_muddati: v.narx_muddati, chek_yuborilgan: v.tolovlar.some(function (p) { return p.holat === 'kutilmoqda'; }) };
     }),
-    menyu: { bugun: menuFor_(t, rid), ertaga: menuFor_(addDays_(t, 1), rid) },
-    doimiy_menyu: all_('Ratsionlar').filter(function (r) {
-      return r.faol && r.tavsif && (!rid || r.id === rid);
-    }).map(function (r) { return { ratsion_id: r.id, ratsion: r.nom, kaloriya: r.kaloriya, taomlar: r.tavsif }; }),
+    menyu_kuni: { bugun: menuDayOf_(t), ertaga: menuDayOf_(addDays_(t, 1)) },
     katalog_bor: catalogList_().length > 0,
+    salomatlik: (function () {
+      var hv = healthView_(client);
+      return { toliq: hv.toliq, kkal: hv.kkal, tavsiya: hv.tavsiya, sorash_kerak: hv.sorash_kerak, statistika: hv.statistika };
+    })(),
     keshbek: cashbackBalance_(client.id),
     karta: { raqam: setting_('karta_raqami'), egasi: setting_('karta_egasi') },
     aloqa: setting_('aloqa_telefon'),
@@ -163,7 +164,7 @@ function orderForm_(client) {
 }
 
 function quoteForClient_(client, p) {
-  var q = quoteFor_(p.ratsion_id, p.paket_id, { use_cashback: !!p.use_cashback, balans: cashbackBalance_(client.id) });
+  var q = quoteFor_(p.ratsion_id, p, { use_cashback: !!p.use_cashback, balans: cashbackBalance_(client.id) });
   var off = offDays_();
   var min = earliestStart_(off);
   var start = p.boshlanish && parseDate_(p.boshlanish) && p.boshlanish >= min ? p.boshlanish : min;
@@ -297,6 +298,14 @@ function clientDetail_(id) {
     }),
     manzillar: clientAddresses_(c.id),
     keshbek: cb,
+    salomatlik: (function () {
+      var hv = healthView_(c);
+      return {
+        toliq: hv.toliq, kkal: hv.kkal, tavsiya: hv.tavsiya, statistika: hv.statistika, tarix: hv.tarix,
+        maqsad: (GOALS[c.maqsad] || {}).nom || '', faollik: (ACTIVITY[c.faollik] || {}).nom || '',
+        boy: c.boy || '', vazn: c.vazn || '', jins: c.jins, tugilgan_yil: c.tugilgan_yil || ''
+      };
+    })(),
     hududlar: settingJson_('hududlar', []),
     manbalar: SOURCES
   };

@@ -148,7 +148,8 @@
         '<form class="card stack" data-submit="save" data-change="recalc">' +
         UI.field('Mijoz', '<input value="' + esc(c.ism + ' · ' + c.telefon) + '" disabled>') +
         UI.field('Ratsion', '<select name="ratsion_id">' + UI.options(rations.map(function (r) { return { value: r.id, label: r.nom + ' — ' + money(r.kunlik_narx) + '/kun' }; })) + '</select>') +
-        UI.field('Paket', '<select name="paket_id">' + UI.options(f.katalog.paketlar.map(function (p) { return { value: p.id, label: p.kunlar + ' kun' + (p.chegirma_foiz ? ' (−' + p.chegirma_foiz + '%)' : '') }; })) + '</select>') +
+        UI.field('Necha kun (ish kuni)', '<input name="kunlar" type="number" inputmode="numeric" min="1" max="' + (f.katalog.max_kunlar || 320) + '" value="10" required>',
+          f.katalog.paketlar.filter(function (p) { return p.chegirma_foiz > 0; }).map(function (p) { return p.kunlar + '+ kun — ' + p.chegirma_foiz + '%'; }).join(' · ')) +
         UI.field('Boshlanish', '<select name="boshlanish">' + UI.options(workDays.map(function (d) { return { value: d.sana, label: UI.date(d.sana, true) }; })) + '</select>') +
         UI.field('Manzil', '<select name="manzil_id">' + UI.options(f.manzillar.map(function (a) { return { value: a.id, label: a.nom + ' — ' + a.matn + ' (' + a.hudud + ')' }; })) + '</select>') +
         (f.keshbek_balans > 0 ? '<label class="chk"><input type="checkbox" name="use_cashback"> Keshbekdan ishlatish (balans ' + som(f.keshbek_balans) + ')</label>' : '') +
@@ -354,6 +355,17 @@
         html += '<div class="card warn"><b>📞 Telefonni ' + esc(c.telefon_sorov) + ' ga o\'zgartirish so\'rovi</b><div class="row gap mt">' +
           '<button class="btn small ok-btn" data-click="phoneYes">Tasdiqlash</button><button class="btn small danger" data-click="phoneNo">Rad etish</button></div></div>';
       }
+      var sh = d.salomatlik || {};
+      if (sh.vazn || sh.maqsad) {
+        html += '<div class="card"><h3>🎯 Kaloriya va vazn</h3><div class="grid2 small">' +
+          '<div><div class="muted">Maqsad</div><b>' + esc(sh.maqsad || '—') + '</b></div>' +
+          '<div><div class="muted">Turmush tarzi</div><b>' + esc(sh.faollik || '—') + '</b></div>' +
+          '<div><div class="muted">Bo\'y / vazn</div><b>' + (sh.boy || '—') + ' sm / ' + (sh.vazn || '—') + ' kg</b></div>' +
+          '<div><div class="muted">Tavsiya</div><b>' + (sh.tavsiya ? esc(sh.tavsiya.ratsion) + ' (' + money(sh.kkal) + ' kkal)' : '—') + '</b></div></div>' +
+          (sh.statistika ? '<div class="mt">Vazn: ' + sh.statistika.boshlangich + ' kg (' + UI.date(sh.statistika.boshlangich_sana) + ') → <b>' + sh.statistika.joriy + ' kg</b> (' +
+            UI.date(sh.statistika.joriy_sana) + ') · <b class="' + (sh.statistika.ozgarish < 0 ? 'save' : '') + '">' + (sh.statistika.ozgarish > 0 ? '+' : '') + sh.statistika.ozgarish + ' kg</b></div>' : '') +
+          '</div>';
+      }
       html += '<div class="card"><div class="row between"><h3>Buyurtmalar</h3><a class="btn small" href="#/orders/new/' + esc(c.id) + '">+ Buyurtma</a></div>' +
         (d.buyurtmalar.length ? '<div class="list">' + d.buyurtmalar.map(function (o) {
           return '<a class="list-item link" href="#/orders/' + esc(o.id) + '"><div class="grow"><b>' + esc(o.ratsion) + ', ' + o.kunlar + ' kun</b> · ' + money(o.tolanadi) +
@@ -393,44 +405,31 @@
     });
   }
 
-  // ---------- Menyu ----------
-  function menu(params, q) {
-    var from = q.dan || UI.today();
-    return api('menuList', { dan: from, gacha: UI.addDays(from, 6) }).then(function (d) {
-      var days = [];
-      for (var i = 0; i < 7; i++) days.push(UI.addDays(from, i));
-      var html = '<h1>Menyu va katalog</h1><div id="catalogBox" class="card"><div class="spinner small"></div></div>' +
-        '<div class="card help-tip">🍽 <b>Doimiy menyu</b> har ratsionga bir marta yoziladi: ' +
-        '<a href="#/pricing">Narx va paketlar</a> → ratsion → <b>Tahrirlash</b> → "Menyu / tavsif". ' +
-        'Pastdagi kunlik menyu ixtiyoriy — faqat biror kunda menyu boshqacha bo\'lsa kiriting.</div>' +
-        '<div class="row between wrap"><h2>Kunlik menyu (ixtiyoriy)</h2><div class="row gap">' +
-        '<a class="btn small ghost" href="#/menu-edit?dan=' + UI.addDays(from, -7) + '">‹</a>' +
-        '<a class="btn small ghost" href="#/menu-edit">Bugun</a>' +
-        '<a class="btn small ghost" href="#/menu-edit?dan=' + UI.addDays(from, 7) + '">›</a></div></div>' +
-        '<p class="hint">Kiritilgan kunda mijoz bosh sahifasida doimiy menyu o\'rniga shu ko\'rinadi.</p>';
-      days.forEach(function (day) {
-        var items = d.items.filter(function (m) { return m.sana === day; });
-        html += '<div class="card"><div class="row between"><h3>' + UI.date(day, true) + '</h3><button class="btn small ghost" data-click="add" data-day="' + day + '">+</button></div>' +
-          (items.length ? items.map(function (m) {
-            return '<button class="list-item link" data-click="edit" data-id="' + esc(m.id) + '"><div class="grow"><b>' + esc(m.ratsion) + '</b> · ' + (m.kaloriya || '—') + ' kkal<div class="small">' + esc(m.taomlar) + '</div></div></button>';
-          }).join('') : '<p class="muted small">Kiritilmagan</p>') + '</div>';
-      });
-      var edit = function (m) {
-        var s = UI.sheet(m.id ? 'Menyuni tahrirlash' : 'Menyu qo\'shish', '<form class="stack" data-submit="save">' +
-          UI.field('Sana', '<input type="date" name="sana" value="' + esc(m.sana) + '" required>') +
-          UI.field('Ratsion', '<select name="ratsion_id">' + UI.options(d.ratsionlar.map(function (r) { return { value: r.id, label: r.nom }; }), m.ratsion_id) + '</select>') +
-          UI.field('Taomlar', '<textarea name="taomlar" rows="4" required placeholder="Nonushta: ...\nTushlik: ...">' + esc(m.taomlar || '') + '</textarea>') +
-          UI.field('Kaloriya', '<input type="number" name="kaloriya" min="0" value="' + esc(m.kaloriya || '') + '">') +
-          '<button class="btn block">Saqlash</button>' + (m.id ? '<button type="button" class="btn link-btn danger-text block" data-click="del">O\'chirish</button>' : '') + '</form>', {
-          save: function (form) { return api('menuSave', Object.assign({ id: m.id }, UI.formData(form))).then(function () { s.close(); UI.reload(); }); },
-          del: function () { return api('menuRemove', { id: m.id }).then(function () { s.close(); UI.reload(); }); }
-        });
-      };
-      UI.view(html, {
-        add: function (el) { edit({ sana: el.dataset.day }); },
-        edit: function (el) { edit(d.items.filter(function (m) { return m.id === el.dataset.id; })[0]); }
-      });
-      A.loadCatalogBox();
+  // ---------- Menyu (katalog rasmlari) ----------
+  function menu() {
+    UI.view('<h1>Menyu</h1><div id="catalogBox" class="card"><div class="spinner small"></div></div>' +
+      '<div class="card help-tip">🍽 Menyu 6 kunlik: dushanba — 1-kun, seshanba — 2-kun ... shanba — 6-kun (yakshanba dam). ' +
+      'Hamma kaloriya variantiga bir xil ovqat tayyorlanadi, faqat porsiya miqdori farq qiladi. ' +
+      'Menyu o\'zgarganda eski rasmni ✕ bilan olib tashlab, yangisini qo\'shing. ' +
+      'Kaloriya va narxlar: <a href="#/pricing">Narx va paketlar</a>.</div>');
+    A.loadCatalogBox();
+  }
+
+  // ---------- Vazn statistikasi ----------
+  function weights() {
+    return api('weightStats').then(function (d) {
+      var html = '<h1>⚖️ Vazn statistikasi</h1>' +
+        '<div class="kpis">' + kpi('Vazn kiritgan', d.jami) + kpi('Ozdi', d.ozdi) + kpi('Vazn oldi', d.vazn_oldi) +
+        kpi('O\'rtacha o\'zgarish', (d.ortacha_ozgarish > 0 ? '+' : '') + d.ortacha_ozgarish + ' kg') + '</div>' +
+        '<p class="hint">Mijozlar ilovada "Kaloriya va vazn" bo\'limida vaznini kiritadi; bot har necha kunda bir so\'raydi (Sozlamalar → Buyurtma qoidalari).</p>';
+      html += d.items.length ? '<div class="table-wrap card"><table class="tbl"><thead><tr><th>Mijoz</th><th>Maqsad</th><th>Boshida</th><th>Hozir</th><th>O\'zgarish</th></tr></thead><tbody>' +
+        d.items.map(function (x) {
+          return '<tr><td><a href="#/clients/' + esc(x.mijoz_id) + '">' + esc(x.ism) + '</a></td><td>' + esc(x.maqsad) + '</td>' +
+            '<td>' + x.boshlangich + ' kg<div class="small muted">' + UI.date(x.boshlangich_sana) + '</div></td>' +
+            '<td>' + x.joriy + ' kg<div class="small muted">' + UI.date(x.joriy_sana) + '</div></td>' +
+            '<td class="' + (x.ozgarish < 0 ? 'save' : '') + '"><b>' + (x.ozgarish > 0 ? '+' : '') + x.ozgarish + ' kg</b></td></tr>';
+        }).join('') + '</tbody></table></div>' : UI.empty('⚖️', 'Hali hech kim vazn kiritmagan');
+      UI.view(html);
     });
   }
 
@@ -485,8 +484,7 @@
         k.ratsionlar.map(function (r) {
           return '<div class="card"><div class="row between"><h3>' + esc(r.ratsion) + '</h3><span class="big">' + r.soni + '</span></div>' +
             '<div class="small muted">' + r.hududlar.map(function (h) { return esc(h.hudud) + ': ' + h.soni; }).join(' · ') + '</div></div>';
-        }).join('') +
-        (k.menyu.length ? '<div class="card"><h3>Menyu</h3>' + k.menyu.map(function (m) { return '<div class="menu-item"><b>' + esc(m.ratsion) + '</b><div>' + esc(m.taomlar) + '</div></div>'; }).join('') + '</div>' : '');
+        }).join('');
       UI.view(html, { date: function (form) { location.hash = '#/delivery?tab=kitchen&sana=' + UI.formData(form).sana; } });
     });
   }
@@ -500,26 +498,27 @@
     UI.route('clients/new', clientNew);
     UI.route('clients/:id', clientDetail);
     UI.route('menu-edit', menu);
+    UI.route('weights', weights);
     UI.route('delivery', delivery);
   };
 })();
 
-/* Oylik katalog: rasmlarni yuklash, tartiblash, olib tashlash (Menyu sahifasida). */
+/* Menyu rasmlari (katalog): yuklash, tartiblash, olib tashlash. */
 (function () {
   'use strict';
   var A = window.AdminApp;
   var esc = UI.esc;
   function render(box, c) {
-    UI.mount(box, '<div class="row between wrap"><h3>📚 Oylik katalog</h3>' +
+    UI.mount(box, '<div class="row between wrap"><h3>🍽 Menyu rasmlari</h3>' +
       '<label class="btn small upload">+ Rasm qo\'shish<input type="file" accept="image/*" multiple hidden data-change="add"></label></div>' +
-      '<p class="hint">Mijoz ilovada "📚 Katalog" bo\'limida ko\'radi. Yangi oy katalogi chiqsa: eskisini ✕ bilan olib tashlang, yangisini qo\'shing. ' +
+      '<p class="hint">Mijoz ilovada "🍽 Menyu" bo\'limida ko\'radi. ' +
       'Ko\'pi bilan 12 ta rasm.</p>' +
       (c.rasmlar.length ? '<div class="catalog-grid">' + c.rasmlar.map(function (x, i) {
         return '<div class="catalog-thumb"><img src="' + esc(x.url) + '" alt=""><div class="row gap">' +
           (i > 0 ? '<button class="btn small ghost" data-click="up" data-i="' + i + '" title="Oldinga">↑</button>' : '') +
           '<button class="btn small danger" data-click="del" data-i="' + i + '" title="Olib tashlash">✕</button></div>' +
           '<div class="small muted">' + (i + 1) + '-rasm · ' + UI.date(x.yuklangan) + '</div></div>';
-      }).join('') + '</div>' : '<p class="muted">Katalog hali joylanmagan.</p>'), {
+      }).join('') + '</div>' : '<p class="muted">Menyu rasmi hali joylanmagan.</p>'), {
       add: function (el) {
         var files = Array.prototype.slice.call(el.files || []);
         if (!files.length) return;
@@ -531,11 +530,11 @@
             }).then(function (res) { c = res; });
           });
         });
-        return chain.then(function () { UI.toast('Katalog yangilandi'); render(box, c); });
+        return chain.then(function () { UI.toast('Menyu yangilandi'); render(box, c); });
       },
       up: function (el) { return UI.api('catalogMove', { i: Number(el.dataset.i), yon: 'yuqori' }).then(function (res) { c = res; render(box, c); }); },
       del: function (el) {
-        return UI.confirm(Number(el.dataset.i) + 1 + '-rasm katalogdan olib tashlansinmi?', 'Olib tashlash', true).then(function (y) {
+        return UI.confirm(Number(el.dataset.i) + 1 + '-rasm olib tashlansinmi?', 'Olib tashlash', true).then(function (y) {
           if (y) return UI.api('catalogRemove', { i: Number(el.dataset.i) }).then(function (res) { c = res; render(box, c); });
         });
       }

@@ -62,8 +62,8 @@
           var s = UI.sheet(r.id ? 'Ratsionni tahrirlash' : 'Yangi ratsion', '<form class="stack" data-submit="save">' +
             UI.field('Nomi', '<input name="nom" required value="' + esc(r.nom || '') + '">') +
             UI.field('Kaloriya (kuniga)', '<input name="kaloriya" maxlength="30" placeholder="1200 yoki 900–1000" value="' + esc(r.kaloriya || '') + '">') +
-            UI.field('Menyu / tavsif (mijozga ko\'rinadi)', '<textarea name="tavsif" rows="5" maxlength="2000" placeholder="Nonushta: ...\nTushlik: ...\nKechki: ...">' + esc(r.tavsif || '') + '</textarea>',
-              'Doimiy menyu shu yerga yoziladi. Mijoz buyurtma berishda va bosh sahifada ko\'radi.') +
+            UI.field('Qisqa tavsif (ixtiyoriy)', '<input name="tavsif" maxlength="120" placeholder="Klassik va qulay tanlov" value="' + esc(r.tavsif || '') + '">',
+              'Narxlar jadvalida nomi ostida ko\'rinadi.') +
             UI.field('Ovqat tannarxi (so\'m/kun)', '<input name="tannarx_ovqat" type="number" min="0" required value="' + esc(r.tannarx_ovqat || 0) + '">') +
             UI.field('Qadoq va yetkazish tannarxi (so\'m/kun)', '<input name="tannarx_qadoq_yetkazish" type="number" min="0" required value="' + esc(r.tannarx_qadoq_yetkazish || 0) + '">') +
             '<label class="chk"><input type="checkbox" name="faol"' + (r.faol ? ' checked' : '') + '> Sotuvda</label>' +
@@ -472,7 +472,8 @@
       ['narx_kafolat_soat', 'To\'lanmagan buyurtmada narx kafolati, soat', 'number'],
       ['bizning_xato_qoida', 'Bizning ayb bilan yetkazilmasa', 'faultRule'],
       ['paket_eslatma_kun', '"Davom etasizmi?" — paket tugashiga necha kun qolganda', 'number'],
-      ['keshbek_eslatma_kun', 'Keshbek muddati tugashiga necha kun qolganda ogohlantirish', 'number']
+      ['keshbek_eslatma_kun', 'Keshbek muddati tugashiga necha kun qolganda ogohlantirish', 'number'],
+      ['vazn_sorash_kun', 'Mijozdan vaznini necha kunda bir so\'rash (bot xabari)', 'number']
     ]],
     ['To\'lov va aloqa', [
       ['karta_raqami', 'Karta raqami', 'text'], ['karta_egasi', 'Karta egasi', 'text'], ['aloqa_telefon', 'Aloqa telefoni', 'text']
@@ -598,7 +599,8 @@
       { path: 'orders', icon: '📦', label: 'Buyurtmalar' },
       { path: 'clients', icon: '👥', label: 'Mijozlar' },
       { path: 'delivery', icon: '🛵', label: 'Yetkazish' },
-      { path: 'menu-edit', icon: '🍽', label: 'Menyu va katalog', more: true }
+      { path: 'menu-edit', icon: '🍽', label: 'Menyu', more: true },
+      { path: 'weights', icon: '⚖️', label: 'Vazn statistikasi', more: true }
     ];
     if (partner) {
       nav = nav.concat([

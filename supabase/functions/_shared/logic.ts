@@ -32,7 +32,9 @@ var SCHEMA = {
   Mijozlar: [
     ['id', 's'], ['tg_id', 's'], ['ism', 's'], ['telefon', 's'], ['manba', 's'],
     ['royxatdan_sana', 'd'], ['holat', 's'], ['izoh', 's'], ['til', 's'],
-    ['rozilik_vaqt', 't'], ['telefon_sorov', 's'], ['kim_yaratdi', 's'], ['faol', 'b']
+    ['rozilik_vaqt', 't'], ['telefon_sorov', 's'], ['kim_yaratdi', 's'], ['faol', 'b'],
+    ['jins', 's'], ['tugilgan_yil', 'n'], ['boy', 'n'], ['vazn', 'f'], ['maqsad', 's'], ['faollik', 's'],
+    ['vazn_soralgan', 'd']
   ],
   Manzillar: [
     ['id', 's'], ['mijoz_id', 's'], ['nom', 's'], ['lat', 'g'], ['lng', 'g'], ['matn', 's'],
@@ -92,6 +94,9 @@ var SCHEMA = {
   Menyu: [
     ['id', 's'], ['sana', 'd'], ['ratsion_id', 's'], ['taomlar', 's'], ['kaloriya', 'n'], ['faol', 'b']
   ],
+  VaznTarix: [
+    ['id', 's'], ['mijoz_id', 's'], ['sana', 'd'], ['vazn', 'f'], ['kim', 's'], ['yaratilgan', 't']
+  ],
   Audit: [
     ['id', 's'], ['vaqt', 't'], ['kim', 's'], ['amal', 's'], ['varaq', 's'], ['yozuv_id', 's'],
     ['eski', 's'], ['yangi', 's'], ['muhim', 's']
@@ -133,7 +138,8 @@ var DEFAULT_SETTINGS = {
   backup_papka_id: '',
   arxiv_papka_id: '',
   chek_papka_id: '',
-  katalog: '[]',                         // oylik katalog rasmlari: [{"yol":"...","nom":"..."}]
+  katalog: '[]',                         // menyu (katalog) rasmlari: [{"yol":"...","nom":"..."}]
+  vazn_sorash_kun: '15',                 // mijozdan vaznini necha kunda bir so'rash (statistika uchun)
   rozilik_matni: "Ro'yxatdan o'tish orqali ism, telefon raqami va manzilingiz buyurtmani yetkazish va xizmat ko'rsatish uchun qayta ishlanishiga rozilik bildirasiz. Istalgan vaqtda ma'lumotlaringizni o'chirishni so'rashingiz mumkin."
 };
 
@@ -435,7 +441,7 @@ var TABLE_NAMES = {
   Narxlar: 'narxlar', Paketlar: 'paketlar', KeshbekQoida: 'keshbek_qoida', Buyurtmalar: 'buyurtmalar',
   Yetkazishlar: 'yetkazishlar', Tolovlar: 'tolovlar', KeshbekHarakat: 'keshbek_harakat',
   XarajatTurkum: 'xarajat_turkum', Xarajatlar: 'xarajatlar', Xodimlar: 'xodimlar', Oyliklar: 'oyliklar',
-  Menyu: 'menyu', Audit: 'audit', Sozlama: 'sozlama'
+  Menyu: 'menyu', VaznTarix: 'vazn_tarix', Audit: 'audit', Sozlama: 'sozlama'
 };
 
 var DB_CACHE = {};
@@ -722,7 +728,7 @@ var SETTING_VALIDATORS = {
   kesish_vaqti: 'hm', ertalabki_xabar_vaqti: 'hm', kun_oxiri_vaqti: 'hm', eslatma_vaqti: 'hm',
   pauza_foiz: 'pct', narx_kafolat_soat: 'int', mijoz_uxlash_kun: 'int', mijoz_ketgan_kun: 'int',
   katta_xarajat: 'int', max_summa: 'int', min_marja_foiz: 'pct', rate_limit_daqiqa: 'int',
-  paket_eslatma_kun: 'int', keshbek_eslatma_kun: 'int',
+  paket_eslatma_kun: 'int', keshbek_eslatma_kun: 'int', vazn_sorash_kun: 'int',
   bayramlar: 'jsonDates', hududlar: 'jsonStrings', kuryer_hudud: 'jsonObj', sherik_ulushlari: 'jsonShares',
   reja: 'jsonPairs', dam_kunlari: 'weekdays', bizning_xato_qoida: 'faultRule',
   ishga_tushish_sana: 'dateOpt', katalog: 'jsonList'
@@ -914,19 +920,45 @@ function calcQuote_(p) {
   };
 }
 
-/** Joriy versiyalar asosida taklif (sana = bugun yoki berilgan). */
-function quoteFor_(ratsionId, paketId, opts) {
+/** Bitta buyurtmada ko'pi bilan necha kun (1 yil ≈ 312 ish kuni, yakshanbasiz). */
+var MAX_ORDER_DAYS = 320;
+
+/**
+ * Buyurtma kunlari: mijoz istalgan sonni yozadi (1 kundan 1 yilgacha).
+ * Eski so'rovlar (paket_id) ham qabul qilinadi — paketning kunlar soni olinadi.
+ */
+function orderDays_(p, date) {
+  if (p && p.kunlar !== undefined && p.kunlar !== null && p.kunlar !== '') {
+    return reqInt_(Number(p.kunlar), 'Kunlar soni', 1, MAX_ORDER_DAYS);
+  }
+  if (p && p.paket_id) return packageById_(p.paket_id, date || today_()).kunlar;
+  fail('Necha kunlik buyurtma ekanini kiriting');
+}
+
+/**
+ * N kunlik buyurtma uchun paket chegirmasi: kunlar soni N dan oshmaydigan eng katta paket
+ * (masalan "10 kun — 10%" paketi bo'lsa, 10, 30, 312 kunlik buyurtmaga 10%; 9 kunlikka chegirma yo'q).
+ * Bekor qilishdagi qayta hisob (discountForDays_) bilan bir xil qoida.
+ */
+function packageForDays_(days, date) {
+  var pkgs = activePackages_(date).filter(function (p) { return p.kunlar <= days; });
+  return pkgs.length ? pkgs[pkgs.length - 1] : null;
+}
+
+/** Joriy versiyalar asosida taklif (sana = bugun yoki berilgan). kunlar — son yoki { kunlar } / { paket_id }. */
+function quoteFor_(ratsionId, kunlar, opts) {
   var date = (opts && opts.date) || today_();
   var ratsion = mustGet_('Ratsionlar', ratsionId, 'Ratsion');
   if (!ratsion.faol) fail('Bu ratsion hozir sotuvda yo\'q');
   var price = priceRow_(ratsionId, date);
   if (!price) fail('Bu ratsion uchun narx belgilanmagan');
-  var pkg = packageById_(paketId, date);
+  var days = typeof kunlar === 'object' ? orderDays_(kunlar, date) : orderDays_({ kunlar: kunlar }, date);
+  var pkg = packageForDays_(days, date);
   var rule = cashbackRule_(date);
   var q = calcQuote_({
-    kunlar: pkg.kunlar,
+    kunlar: days,
     kunlik_narx: price.kunlik_narx,
-    chegirma_foiz: pkg.chegirma_foiz,
+    chegirma_foiz: pkg ? pkg.chegirma_foiz : 0,
     keshbek_foiz: rule.foiz,
     max_ulush_foiz: rule.max_ulush_foiz,
     min_summa: rule.min_summa,
@@ -934,9 +966,17 @@ function quoteFor_(ratsionId, paketId, opts) {
     balans: (opts && opts.balans) || 0
   });
   q.ratsion_id = ratsionId;
-  q.paket_id = pkg.id;
+  q.paket_id = pkg ? pkg.id : '';
   q.keshbek_muddat_kun = rule.amal_muddati_kun;
   return q;
+}
+
+/** Ratsion kaloriyasi matnidan son: "1200" → 1200, "900–1000" → 950. */
+function kcalOf_(text) {
+  var m = String(text || '').match(/\d+/g);
+  if (!m) return 0;
+  var a = Number(m[0]), b = m.length > 1 ? Number(m[1]) : a;
+  return Math.round((a + b) / 2);
 }
 
 /** Barcha ratsion × paket kombinatsiyalari: "Chegirmalar" ekrani (6.1, 4-ekran). */
@@ -962,6 +1002,7 @@ function catalog_(date) {
   }).filter(function (r) { return r.kunlik_narx > 0; });
   return {
     sana: d,
+    max_kunlar: MAX_ORDER_DAYS,
     ratsionlar: rations,
     paketlar: pkgs.map(function (p) { return pick_(p, ['id', 'nom', 'kunlar', 'chegirma_foiz']); }),
     keshbek: pick_(rule, ['foiz', 'amal_muddati_kun', 'min_summa', 'max_ulush_foiz'])
@@ -1286,7 +1327,7 @@ function priceLockMs_() {
 
 /**
  * Yangi buyurtma. source: 'mijoz' (o'zi) yoki 'admin' (mijoz nomidan qo'lda).
- * p: { ratsion_id, paket_id, boshlanish, manzil_id, use_cashback, izoh }
+ * p: { ratsion_id, kunlar (yoki eski paket_id), boshlanish, manzil_id, use_cashback, izoh }
  */
 function createOrder_(ctx, client, p, source) {
   var ratsion = mustGet_('Ratsionlar', p.ratsion_id, 'Ratsion');
@@ -1298,7 +1339,7 @@ function createOrder_(ctx, client, p, source) {
   if (!isWorkDay_(start, off)) fail('Bu kun dam olish kuni. Boshqa sanani tanlang');
 
   var balance = cashbackBalance_(client.id);
-  var q = quoteFor_(ratsion.id, p.paket_id, { use_cashback: !!p.use_cashback, balans: balance });
+  var q = quoteFor_(ratsion.id, p, { use_cashback: !!p.use_cashback, balans: balance });
   var dates = deliveryDates_(start, q.kunlar, off);
   var actor = actor_(ctx);
   var order = insert_('Buyurtmalar', {
@@ -1348,7 +1389,7 @@ function refreshStaleOrder_(order, actor) {
   var balance = cashbackBalance_(order.mijoz_id) + order.keshbek_ishlatildi; // band qilingan keshbek ham hisobga
   var q;
   try {
-    q = quoteFor_(order.ratsion_id, order.paket_id, { use_cashback: order.keshbek_ishlatildi > 0, balans: balance });
+    q = quoteFor_(order.ratsion_id, order.kunlar, { use_cashback: order.keshbek_ishlatildi > 0, balans: balance });
   } catch (e) {
     return false; // ratsion/paket sotuvdan olingan — admin hal qiladi
   }
@@ -1559,9 +1600,8 @@ function unpauseDay_(ctx, order, deliveryId, byStaff) {
 
 /** Paket chegirmasi: ishlatilgan kunlar sonidan oshmaydigan eng katta paket (buyurtma sanasidagi versiya). */
 function discountForDays_(days, date) {
-  var pkgs = activePackages_(date).filter(function (p) { return p.kunlar <= days; });
-  if (!pkgs.length) return 0;
-  return pkgs[pkgs.length - 1].chegirma_foiz;
+  var pkg = packageForDays_(days, date);
+  return pkg ? pkg.chegirma_foiz : 0;
 }
 
 /**
@@ -2777,11 +2817,12 @@ function clientHome_(client) {
       return { id: v.id, ratsion: v.ratsion, kunlar: v.kunlar, tolanadi: v.tolanadi, tolangan: v.tolangan,
         narx_muddati: v.narx_muddati, chek_yuborilgan: v.tolovlar.some(function (p) { return p.holat === 'kutilmoqda'; }) };
     }),
-    menyu: { bugun: menuFor_(t, rid), ertaga: menuFor_(addDays_(t, 1), rid) },
-    doimiy_menyu: all_('Ratsionlar').filter(function (r) {
-      return r.faol && r.tavsif && (!rid || r.id === rid);
-    }).map(function (r) { return { ratsion_id: r.id, ratsion: r.nom, kaloriya: r.kaloriya, taomlar: r.tavsif }; }),
+    menyu_kuni: { bugun: menuDayOf_(t), ertaga: menuDayOf_(addDays_(t, 1)) },
     katalog_bor: catalogList_().length > 0,
+    salomatlik: (function () {
+      var hv = healthView_(client);
+      return { toliq: hv.toliq, kkal: hv.kkal, tavsiya: hv.tavsiya, sorash_kerak: hv.sorash_kerak, statistika: hv.statistika };
+    })(),
     keshbek: cashbackBalance_(client.id),
     karta: { raqam: setting_('karta_raqami'), egasi: setting_('karta_egasi') },
     aloqa: setting_('aloqa_telefon'),
@@ -2807,7 +2848,7 @@ function orderForm_(client) {
 }
 
 function quoteForClient_(client, p) {
-  var q = quoteFor_(p.ratsion_id, p.paket_id, { use_cashback: !!p.use_cashback, balans: cashbackBalance_(client.id) });
+  var q = quoteFor_(p.ratsion_id, p, { use_cashback: !!p.use_cashback, balans: cashbackBalance_(client.id) });
   var off = offDays_();
   var min = earliestStart_(off);
   var start = p.boshlanish && parseDate_(p.boshlanish) && p.boshlanish >= min ? p.boshlanish : min;
@@ -2941,6 +2982,14 @@ function clientDetail_(id) {
     }),
     manzillar: clientAddresses_(c.id),
     keshbek: cb,
+    salomatlik: (function () {
+      var hv = healthView_(c);
+      return {
+        toliq: hv.toliq, kkal: hv.kkal, tavsiya: hv.tavsiya, statistika: hv.statistika, tarix: hv.tarix,
+        maqsad: (GOALS[c.maqsad] || {}).nom || '', faollik: (ACTIVITY[c.faollik] || {}).nom || '',
+        boy: c.boy || '', vazn: c.vazn || '', jins: c.jins, tugilgan_yil: c.tugilgan_yil || ''
+      };
+    })(),
     hududlar: settingJson_('hududlar', []),
     manbalar: SOURCES
   };
@@ -3555,7 +3604,7 @@ function handleReceiptPhoto_(tgId, photoDataUrl) {
  *
  *  - tungi: keshbek muddati, tugagan paketlar, mijoz holatlari, zaxira nusxa (11.4)
  *  - ertalab: "Bugun ovqatingiz yo'lda" (6.3)
- *  - eslatmalar: paket tugashiga 2 kun, keshbek tugashiga 7 kun (6.3)
+ *  - eslatmalar: paket tugashiga 2 kun, keshbek tugashiga 7 kun (6.3), har 15 kunda vazn so'rash
  *  - kesish vaqti: kuryer biriktirish, zaxira ro'yxat Telegram guruhga, oshxona hisoboti (8.2, 11.4)
  *  - har soat: 48 soatdan eski to'lanmagan buyurtmalar qayta hisoblanadi (5.2)
  */
@@ -3587,6 +3636,7 @@ function cronTick_() {
   once('tungi', '00:05', jobNightly_);
   once('ertalab', setting_('ertalabki_xabar_vaqti'), jobMorning_);
   once('eslatma', setting_('eslatma_vaqti'), jobReminders_);
+  once('vazn', setting_('eslatma_vaqti'), jobWeightAsk_);
   once('kesish', setting_('kesish_vaqti'), jobCutoff_);
   var hourVal = t + 'T' + nowHM_().slice(0, 2);
   if (cache.get('job_soat') !== hourVal) {
@@ -3774,11 +3824,14 @@ var ACTIONS = {
   addressSave: { r: R_CLIENT, w: 1, fn: function (ctx, p) { addressSave_(ctx, ctx.client.id, p); return { items: clientAddresses_(ctx.client.id) }; } },
   addressRemove: { r: R_CLIENT, w: 1, fn: function (ctx, p) { addressRemove_(ctx, ctx.client.id, p.id); return { items: clientAddresses_(ctx.client.id) }; } },
   profile: { r: R_CLIENT, fn: function (ctx) { return profileView_(ctx.client); } },
+  health: { r: R_CLIENT, fn: function (ctx) { return healthView_(ctx.client); } },
+  healthSave: { r: R_CLIENT, w: 1, fn: function (ctx, p) { return healthSave_(ctx, ctx.client, p); } },
   profileUpdate: { r: R_CLIENT, w: 1, fn: function (ctx, p) { return profileUpdate_(ctx, p); } },
   requestPhoneChange: { r: R_CLIENT, w: 1, fn: function (ctx, p) { return requestPhoneChange_(ctx, p); } },
 
   // ---- admin panel: sherik va operator (7-bo'lim) ----
   adminToday: { r: R_STAFF, fn: function (ctx) { return adminToday_(ctx); } },
+  weightStats: { r: R_STAFF, fn: function () { return weightStats_(); } },
   ordersList: { r: R_STAFF, fn: function (ctx, p) { return ordersList_(p); } },
   orderGet: { r: R_STAFF, fn: function (ctx, p) { return orderView_(staffOrder_(p.id), false); } },
   paymentConfirm: {
@@ -4078,6 +4131,196 @@ function seedTestData_() {
   for (var k = 0; k < dels.length; k += 2000) insertMany_('Yetkazishlar', dels.slice(k, k + 2000), 'tizim');
   dbFlush_();
   return 'Qo\'shildi: 100 mijoz, 300 buyurtma, ' + dels.length + ' yetkazish';
+}
+
+// ===== 17_Health.js =====
+/**
+ * Kaloriya tavsiyasi va vazn statistikasi.
+ *
+ * Mijoz jinsi, yoshi, bo'yi, vazni, maqsadi va turmush tarzini kiritadi →
+ * kunlik kaloriya ehtiyoji hisoblanadi (Mifflin–San Jeor formulasi) va unga eng yaqin ratsion tavsiya qilinadi.
+ * Vazn har o'zgarganda VaznTarix ga yoziladi (bir kunda bitta yozuv), har 15 kunda bot qayta so'raydi.
+ */
+
+var GOALS = {
+  ozish: { nom: 'Ozmoqchiman', k: 0.8 },
+  saqlash: { nom: 'Vaznimni saqlamoqchiman', k: 1 },
+  vazn_olish: { nom: 'Vazn olmoqchiman', k: 1.15 }
+};
+
+var ACTIVITY = {
+  ofis: { nom: 'Kam harakat (ofisda o\'tirib ishlayman)', k: 1.2 },
+  ortacha: { nom: 'O\'rtacha (haftada 1–3 marta mashq)', k: 1.375 },
+  sport: { nom: 'Faol (haftada 4+ marta shug\'ullanaman)', k: 1.55 }
+};
+
+function healthComplete_(c) {
+  return !!(c.jins && c.tugilgan_yil && c.boy && c.vazn && GOALS[c.maqsad] && ACTIVITY[c.faollik]);
+}
+
+/** Kunlik kaloriya ehtiyoji (kkal). */
+function dailyKcal_(c) {
+  var age = Number(today_().slice(0, 4)) - c.tugilgan_yil;
+  var bmr = 10 * c.vazn + 6.25 * c.boy - 5 * age + (c.jins === 'erkak' ? 5 : -161);
+  return Math.round(bmr * ACTIVITY[c.faollik].k * GOALS[c.maqsad].k / 10) * 10;
+}
+
+/** Ehtiyojga eng yaqin kaloriyali faol (narxi bor) ratsion. */
+function recommendRation_(kcal) {
+  var d = today_();
+  var best = null;
+  all_('Ratsionlar').forEach(function (r) {
+    if (!r.faol) return;
+    var k = kcalOf_(r.kaloriya);
+    var price = priceRow_(r.id, d);
+    if (!k || !price) return;
+    var diff = Math.abs(k - kcal);
+    if (!best || diff < best.diff) best = { diff: diff, r: r, kunlik_narx: price.kunlik_narx };
+  });
+  if (!best) return null;
+  return {
+    ratsion_id: best.r.id, ratsion: best.r.nom, kaloriya: best.r.kaloriya,
+    tavsif: best.r.tavsif, kunlik_narx: best.kunlik_narx
+  };
+}
+
+function weightHistory_(clientId) {
+  return where_('VaznTarix', function (w) { return w.mijoz_id === clientId; })
+    .sort(function (a, b) { return a.sana < b.sana ? -1 : a.sana > b.sana ? 1 : 0; });
+}
+
+/** Vazn yana so'ralishi kerakmi (oxirgi o'lchovdan N kun o'tgan). */
+function weightDue_(c, hist) {
+  if (!c.vazn) return false;
+  var h = hist || weightHistory_(c.id);
+  var last = h.length ? h[h.length - 1].sana : '';
+  var n = settingNum_('vazn_sorash_kun') || 15;
+  return !last || diffDays_(last, today_()) >= n;
+}
+
+function weightSummary_(hist) {
+  if (!hist.length) return null;
+  var first = hist[0], last = hist[hist.length - 1];
+  return {
+    boshlangich: first.vazn, boshlangich_sana: first.sana,
+    joriy: last.vazn, joriy_sana: last.sana,
+    ozgarish: round2_(last.vazn - first.vazn)
+  };
+}
+
+function healthView_(c) {
+  var hist = weightHistory_(c.id);
+  var done = healthComplete_(c);
+  var kcal = done ? dailyKcal_(c) : 0;
+  return {
+    profil: {
+      jins: c.jins, tugilgan_yil: c.tugilgan_yil || '', boy: c.boy || '', vazn: c.vazn || '',
+      maqsad: c.maqsad, faollik: c.faollik
+    },
+    toliq: done,
+    kkal: kcal,
+    tavsiya: done ? recommendRation_(kcal) : null,
+    tarix: hist.slice(-60).map(function (w) { return { sana: w.sana, vazn: w.vazn }; }),
+    statistika: weightSummary_(hist),
+    sorash_kerak: weightDue_(c, hist),
+    sorash_kun: settingNum_('vazn_sorash_kun') || 15,
+    maqsadlar: Object.keys(GOALS).map(function (k) { return { value: k, label: GOALS[k].nom }; }),
+    faolliklar: Object.keys(ACTIVITY).map(function (k) { return { value: k, label: ACTIVITY[k].nom }; })
+  };
+}
+
+function reqWeight_(v) {
+  var n = Math.round(Number(String(v === undefined || v === null ? '' : v).replace(',', '.')) * 10) / 10;
+  if (!isFinite(n) || n < 30 || n > 300) fail('Vazn 30 va 300 kg oralig\'ida bo\'lishi kerak');
+  return n;
+}
+
+/** Vaznni tarixga yozish: bugungi yozuv bo'lsa yangilanadi. */
+function recordWeight_(clientId, vazn, actor) {
+  var t = today_();
+  var ex = where_('VaznTarix', function (w) { return w.mijoz_id === clientId && w.sana === t; })[0];
+  if (ex) {
+    if (ex.vazn !== vazn) update_('VaznTarix', ex.id, { vazn: vazn }, actor, { audit: false });
+  } else {
+    insert_('VaznTarix', { mijoz_id: clientId, sana: t, vazn: vazn, kim: actor, yaratilgan: nowIso_() }, actor, { audit: false });
+  }
+}
+
+/** Mijoz profilini (maqsad, bo'y, vazn ...) saqlaydi. Istalgan maydonni alohida yuborish mumkin. */
+function healthSave_(ctx, c, p) {
+  var patch = {};
+  var year = Number(today_().slice(0, 4));
+  if (p.jins !== undefined) {
+    if (p.jins !== 'erkak' && p.jins !== 'ayol') fail('Jinsni tanlang');
+    patch.jins = p.jins;
+  }
+  if (p.tugilgan_yil !== undefined) patch.tugilgan_yil = reqInt_(Number(p.tugilgan_yil), 'Tug\'ilgan yil', year - 100, year - 10);
+  if (p.boy !== undefined) patch.boy = reqInt_(Number(p.boy), 'Bo\'y (sm)', 100, 230);
+  if (p.maqsad !== undefined) {
+    if (!GOALS[p.maqsad]) fail('Maqsadni tanlang');
+    patch.maqsad = p.maqsad;
+  }
+  if (p.faollik !== undefined) {
+    if (!ACTIVITY[p.faollik]) fail('Turmush tarzini tanlang');
+    patch.faollik = p.faollik;
+  }
+  var actor = actor_(ctx);
+  if (p.vazn !== undefined && p.vazn !== '') {
+    patch.vazn = reqWeight_(p.vazn);
+    patch.vazn_soralgan = today_();
+    recordWeight_(c.id, patch.vazn, actor);
+  }
+  update_('Mijozlar', c.id, patch, actor, { amal: 'salomatlik' });
+  return healthView_(c);
+}
+
+/** Har N kunda faol mijozlardan vaznini so'rash (bot xabari). */
+function jobWeightAsk_() {
+  var t = today_();
+  var n = settingNum_('vazn_sorash_kun') || 15;
+  var activeIds = {};
+  all_('Buyurtmalar').forEach(function (o) { if (o.holat === 'faol') activeIds[o.mijoz_id] = true; });
+  withLock_(function () {
+    all_('Mijozlar').forEach(function (c) {
+      if (!c.faol || !c.tg_id || !c.vazn || !activeIds[c.id]) return;
+      if (!weightDue_(c)) return;
+      if (c.vazn_soralgan && diffDays_(c.vazn_soralgan, t) < n) return;
+      notifyClient_(c.id, '⚖️ ' + n + ' kun o\'tdi! Bugungi vazningizni kiriting — natijangizni (ozish/vazn olish) kuzatib boramiz.',
+        openAppMarkup_('⚖️ Vaznni kiritish'));
+      update_('Mijozlar', c.id, { vazn_soralgan: t }, 'tizim', { audit: false });
+    });
+  });
+}
+
+/** Admin: mijozlar vazn statistikasi (boshlang'ich → joriy). */
+function weightStats_() {
+  var byClient = groupBy_(all_('VaznTarix'), function (w) { return w.mijoz_id; });
+  var items = [];
+  Object.keys(byClient).forEach(function (cid) {
+    var c = get_('Mijozlar', cid);
+    if (!c || !c.faol) return;
+    var s = weightSummary_(byClient[cid].sort(function (a, b) { return a.sana < b.sana ? -1 : 1; }));
+    items.push({
+      mijoz_id: cid, ism: c.ism, maqsad: (GOALS[c.maqsad] || {}).nom || '',
+      boshlangich: s.boshlangich, boshlangich_sana: s.boshlangich_sana,
+      joriy: s.joriy, joriy_sana: s.joriy_sana, ozgarish: s.ozgarish, olchovlar: byClient[cid].length
+    });
+  });
+  items.sort(function (a, b) { return a.ozgarish - b.ozgarish; });
+  var withChange = items.filter(function (x) { return x.olchovlar > 1; });
+  return {
+    items: items,
+    jami: items.length,
+    ozdi: withChange.filter(function (x) { return x.ozgarish < 0; }).length,
+    vazn_oldi: withChange.filter(function (x) { return x.ozgarish > 0; }).length,
+    ortacha_ozgarish: withChange.length ? round2_(sum_(withChange, function (x) { return x.ozgarish; }) / withChange.length) : 0
+  };
+}
+
+/** Menyu 6 kunlik: dushanba = 1-kun ... shanba = 6-kun, yakshanba dam. */
+function menuDayOf_(date) {
+  var w = weekday_(date);
+  return w === 0 ? 0 : w;
 }
 
 

@@ -4,7 +4,7 @@
  *
  *  - tungi: keshbek muddati, tugagan paketlar, mijoz holatlari, zaxira nusxa (11.4)
  *  - ertalab: "Bugun ovqatingiz yo'lda" (6.3)
- *  - eslatmalar: paket tugashiga 2 kun, keshbek tugashiga 7 kun (6.3)
+ *  - eslatmalar: paket tugashiga 2 kun, keshbek tugashiga 7 kun (6.3), har 15 kunda vazn so'rash
  *  - kesish vaqti: kuryer biriktirish, zaxira ro'yxat Telegram guruhga, oshxona hisoboti (8.2, 11.4)
  *  - har soat: 48 soatdan eski to'lanmagan buyurtmalar qayta hisoblanadi (5.2)
  */
@@ -36,6 +36,7 @@ function cronTick_() {
   once('tungi', '00:05', jobNightly_);
   once('ertalab', setting_('ertalabki_xabar_vaqti'), jobMorning_);
   once('eslatma', setting_('eslatma_vaqti'), jobReminders_);
+  once('vazn', setting_('eslatma_vaqti'), jobWeightAsk_);
   once('kesish', setting_('kesish_vaqti'), jobCutoff_);
   var hourVal = t + 'T' + nowHM_().slice(0, 2);
   if (cache.get('job_soat') !== hourVal) {

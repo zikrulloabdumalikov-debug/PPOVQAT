@@ -82,11 +82,14 @@ var ACTIONS = {
   addressSave: { r: R_CLIENT, w: 1, fn: function (ctx, p) { addressSave_(ctx, ctx.client.id, p); return { items: clientAddresses_(ctx.client.id) }; } },
   addressRemove: { r: R_CLIENT, w: 1, fn: function (ctx, p) { addressRemove_(ctx, ctx.client.id, p.id); return { items: clientAddresses_(ctx.client.id) }; } },
   profile: { r: R_CLIENT, fn: function (ctx) { return profileView_(ctx.client); } },
+  health: { r: R_CLIENT, fn: function (ctx) { return healthView_(ctx.client); } },
+  healthSave: { r: R_CLIENT, w: 1, fn: function (ctx, p) { return healthSave_(ctx, ctx.client, p); } },
   profileUpdate: { r: R_CLIENT, w: 1, fn: function (ctx, p) { return profileUpdate_(ctx, p); } },
   requestPhoneChange: { r: R_CLIENT, w: 1, fn: function (ctx, p) { return requestPhoneChange_(ctx, p); } },
 
   // ---- admin panel: sherik va operator (7-bo'lim) ----
   adminToday: { r: R_STAFF, fn: function (ctx) { return adminToday_(ctx); } },
+  weightStats: { r: R_STAFF, fn: function () { return weightStats_(); } },
   ordersList: { r: R_STAFF, fn: function (ctx, p) { return ordersList_(p); } },
   orderGet: { r: R_STAFF, fn: function (ctx, p) { return orderView_(staffOrder_(p.id), false); } },
   paymentConfirm: {

@@ -64,7 +64,7 @@
         }).then(function () {
           UI.haptic('success');
           clearTimeout(pollTimer);
-          location.hash = '#/order';
+          location.hash = '#/health?yangi=1';
           location.reload();
         });
       }
@@ -72,12 +72,8 @@
   }
 
   // ---------- 2. Bosh sahifa ----------
-  function menuBlock(title, items) {
-    if (!items.length) return '<div class="menu-day"><div class="muted small">' + title + '</div><div class="muted">Menyu hali kiritilmagan</div></div>';
-    return '<div class="menu-day"><div class="muted small">' + title + '</div>' + items.map(function (m) {
-      return '<div class="menu-item"><b>' + esc(m.ratsion) + '</b>' + (m.kaloriya ? ' · ' + esc(m.kaloriya) + ' kkal' : '') + '<div>' + esc(m.taomlar) + '</div></div>';
-    }).join('') + '</div>';
-  }
+  var DAY_NAMES = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+  function menuDayText(n) { return n ? n + '-kun menyusi' : 'dam olish kuni'; }
 
   function home() {
     return api('home').then(function (d) {
@@ -96,67 +92,84 @@
           '<div class="row gap mt"><a class="btn ghost grow" href="#/orders/' + esc(p.id) + '">Kunlar va pauza</a>' +
           '<a class="btn grow" href="#/order">Davom ettirish</a></div></div>';
       } else if (!d.tolov_kutilmoqda.length) {
-        html += '<div class="card accent"><h3>Faol paketingiz yo\'q</h3><p>Ratsion va paketni tanlang — uzoqroq paketda chegirma va keshbek ko\'proq.</p>' +
+        html += '<div class="card accent"><h3>Faol buyurtmangiz yo\'q</h3><p>O\'zingizga mos kaloriyani tanlang va istalgan kunga buyurtma bering (1 kundan 1 yilgacha).</p>' +
           '<a class="btn block" href="#/order">🛒 Buyurtma berish</a></div>';
       }
+      var h = d.salomatlik || {};
+      if (h.sorash_kerak) {
+        html += '<a class="card warn link" href="#/health"><div class="row between"><b>⚖️ Vazningizni kiriting</b><span>›</span></div>' +
+          '<div class="small">Natijangizni kuzatib borish uchun bugungi vazningizni yozing</div></a>';
+      }
+      if (!h.toliq) {
+        html += '<a class="card link accent" href="#/health"><div class="row between"><div><b>🎯 Sizga qaysi kaloriya mos?</b>' +
+          '<div class="small muted">Bo\'yingiz, vazningiz va maqsadingizni kiriting — mos variantni tavsiya qilamiz</div></div><span>›</span></div></a>';
+      } else if (h.tavsiya) {
+        html += '<a class="card link" href="#/health"><div class="row between"><div><div class="muted small">Sizga tavsiya</div><b>' + esc(h.tavsiya.ratsion) + '</b>' +
+          (h.tavsiya.kaloriya ? ' · ' + esc(h.tavsiya.kaloriya) + ' kkal' : '') +
+          (h.statistika && h.statistika.ozgarish ? '<div class="small ' + (h.statistika.ozgarish < 0 ? 'save' : '') + '">Vazn: ' +
+            (h.statistika.ozgarish > 0 ? '+' : '') + h.statistika.ozgarish + ' kg (' + h.statistika.joriy + ' kg)</div>' : '') +
+          '</div><span class="big-ico">🎯</span></div></a>';
+      }
+      var mk = d.menyu_kuni || {};
+      html += '<a class="card link" href="#/catalog"><div class="row between"><div><b>🍽 Menyu</b>' +
+        '<div class="small muted">Bugun: ' + menuDayText(mk.bugun) + ' · Ertaga: ' + menuDayText(mk.ertaga) + '</div></div><span>›</span></div></a>';
+      html += '<a class="card link" href="#/discounts"><div class="row between"><b>💲 Narxlar</b><span>›</span></div>' +
+        '<div class="small muted">Kaloriya variantlari va kunlik narxlar</div></a>';
       html += '<a class="card link" href="#/cashback"><div class="row between"><div><div class="muted small">Keshbek balansi</div><div class="big">' +
         som(d.keshbek) + '</div></div><span class="big-ico">💰</span></div></a>';
-      if (d.katalog_bor) {
-        html += '<a class="card link accent" href="#/catalog"><div class="row between"><div><b>📚 Oylik katalog</b>' +
-          '<div class="small muted">Yangi taomlar va takliflar</div></div><span>›</span></div></a>';
-      }
-      if (d.menyu.bugun.length || d.menyu.ertaga.length) {
-        html += '<div class="card"><h3>Menyu</h3>' + menuBlock('Bugun', d.menyu.bugun) + menuBlock('Ertaga', d.menyu.ertaga) + '</div>';
-      } else if (d.doimiy_menyu.length) {
-        html += '<div class="card"><h3>Menyu</h3>' + d.doimiy_menyu.map(function (m) {
-          return '<div class="menu-item"><b>' + esc(m.ratsion) + '</b>' + (m.kaloriya ? ' · ' + esc(m.kaloriya) + ' kkal' : '') + '<div>' + esc(m.taomlar) + '</div></div>';
-        }).join('') + '</div>';
-      }
-      html += '<a class="card link" href="#/discounts"><div class="row between"><b>🏷 Chegirmalar va paketlar</b><span>›</span></div>' +
-        '<div class="small muted">Qancha tejashingizni ko\'ring</div></a>';
       if (d.aloqa) html += '<p class="center small muted">Savollar: <a href="tel:' + esc(d.aloqa) + '">' + esc(d.aloqa) + '</a> · Yetkazish ' + esc(d.yetkazish_vaqti) + '</p>';
       UI.view(html);
     });
   }
 
   // ---------- 3. Buyurtma berish ----------
+  var QUICK_DAYS = [1, 6, 10, 24, 30, 312];
+  function daysLabel(n) { return n === 312 ? '1 yil' : n + ' kun'; }
+  function discountRules(paketlar) {
+    return paketlar.filter(function (p) { return p.chegirma_foiz > 0; }).map(function (p) {
+      return p.kunlar + ' kun va undan ko\'p — ' + p.chegirma_foiz + '% chegirma';
+    });
+  }
+
   function orderPage(params, query) {
-    return api('orderForm').then(function (f) {
+    return Promise.all([api('orderForm'), api('health', {}, { silent: true }).catch(function () { return null; })]).then(function (res) {
+      var f = res[0], hv = res[1];
       var rations = f.katalog.ratsionlar;
       if (!rations.length) { UI.view(UI.empty('🍽', 'Hozircha sotuvda ratsion yo\'q')); return; }
+      var recId = hv && hv.tavsiya ? hv.tavsiya.ratsion_id : '';
       var st = {
-        ratsion_id: query.ratsion || rations[0].id,
-        paket_id: '',
+        ratsion_id: query.ratsion || recId || rations[0].id,
+        kunlar: Number(query.kun) || 10,
         boshlanish: f.eng_erta,
         manzil_id: f.manzillar.length ? f.manzillar[0].id : '',
         use_cashback: false
       };
-      var ration = function () { return rations.filter(function (r) { return r.id === st.ratsion_id; })[0] || rations[0]; };
-      if (!st.paket_id) {
-        var pk = ration().paketlar;
-        st.paket_id = (pk[1] || pk[0] || {}).paket_id || '';
-      }
+      if (!rations.some(function (r) { return r.id === st.ratsion_id; })) st.ratsion_id = rations[0].id;
+      var maxDays = f.katalog.max_kunlar || 320;
+      var rules = discountRules(f.katalog.paketlar);
+      var quick = QUICK_DAYS.concat(f.katalog.paketlar.map(function (p) { return p.kunlar; }))
+        .filter(function (n, i, a) { return n <= maxDays && a.indexOf(n) === i; }).sort(function (x, y) { return x - y; });
       var workDays = f.kalendar.filter(function (d) { return d.ish_kuni; }).slice(0, 14);
 
       var render = function () {
-        var r = ration();
         var html = '<h1>Buyurtma berish</h1>' +
-          '<h3 class="sec">1. Ratsion</h3><div class="chips">' + rations.map(function (x) {
-            return '<button class="chip-btn ' + (x.id === st.ratsion_id ? 'on' : '') + '" data-click="ration" data-id="' + esc(x.id) + '">' +
-              esc(x.nom) + (x.kaloriya ? ' · ' + esc(x.kaloriya) + ' kkal' : '') + '</button>';
-          }).join('') + '</div>' + (r.tavsif ? '<div class="menu-text small">' + esc(r.tavsif) + '</div>' : '') +
-          '<h3 class="sec">2. Paket</h3><div class="pkgs">' + r.paketlar.map(function (p) {
-            return '<button class="pkg ' + (p.paket_id === st.paket_id ? 'on' : '') + '" data-click="pkg" data-id="' + esc(p.paket_id) + '">' +
-              '<div class="pkg-days">' + p.kunlar + ' kun</div>' +
-              (p.chegirma_foiz ? '<div class="pkg-disc">−' + p.chegirma_foiz + '%</div>' : '<div class="pkg-disc none">chegirmasiz</div>') +
-              '<div class="pkg-total">' + som(p.jami) + '</div><div class="small muted">kuniga ' + UI.money(p.kuniga) + '</div>' +
-              (p.tejaladi ? '<div class="small save">Tejaysiz: ' + UI.money(p.tejaladi) + '</div>' : '') +
-              (p.yangi_keshbek ? '<div class="small">+' + UI.money(p.yangi_keshbek) + ' keshbek</div>' : '') + '</button>';
+          '<h3 class="sec">1. Kaloriya varianti</h3><div class="list">' + rations.map(function (x) {
+            return '<label class="list-item"><input type="radio" name="rat" value="' + esc(x.id) + '" data-change="ration"' + (x.id === st.ratsion_id ? ' checked' : '') + '>' +
+              '<div class="grow"><b>' + esc(x.nom) + '</b>' + (x.id === recId ? ' <span class="badge st-faol">Sizga tavsiya</span>' : '') +
+              '<div class="small muted">' + (x.kaloriya ? esc(x.kaloriya) + ' kkal' : '') + (x.tavsif ? ' · ' + esc(x.tavsif) : '') + '</div></div>' +
+              '<b class="nowrap">' + UI.money(x.kunlik_narx) + '</b></label>';
           }).join('') + '</div>' +
+          (recId ? '' : '<a class="small" href="#/health">🎯 Qaysi biri menga mos? Bilib olish</a>') +
+          '<h3 class="sec">2. Necha kunga?</h3><div class="chips">' + quick.map(function (n) {
+            return '<button class="chip-btn ' + (n === st.kunlar ? 'on' : '') + '" data-click="days" data-id="' + n + '">' + daysLabel(n) + '</button>';
+          }).join('') + '</div>' +
+          '<div class="row gap mt"><input type="number" inputmode="numeric" min="1" max="' + maxDays + '" id="daysInput" class="days-input" value="' + st.kunlar + '" data-change="daysInput">' +
+          '<span class="muted">ish kuni</span></div>' +
+          '<p class="hint">Yakshanba dam olish kuni — kunlar faqat yetkazish kunlari hisoblanadi.' + (rules.length ? ' ' + esc(rules.join('; ')) + '.' : '') + '</p>' +
           '<h3 class="sec">3. Boshlanish sanasi</h3><div class="chips scroll">' + workDays.map(function (d) {
             return '<button class="chip-btn date ' + (d.sana === st.boshlanish ? 'on' : '') + '" data-click="date" data-id="' + d.sana + '">' +
               '<span class="small">' + UI.wd(d.sana) + '</span><br>' + UI.dateShort(d.sana) + '</button>';
-          }).join('') + '</div><p class="hint">Kesish vaqti ' + esc(f.kesish_vaqti) + ': undan keyin ertangi kunga buyurtma qabul qilinmaydi. Yakshanba dam olish kuni.</p>' +
+          }).join('') + '</div><p class="hint">Kesish vaqti ' + esc(f.kesish_vaqti) + ': undan keyin ertangi kunga buyurtma qabul qilinmaydi.</p>' +
           '<h3 class="sec">4. Manzil</h3><div class="list">' + f.manzillar.map(function (a) {
             return '<label class="list-item"><input type="radio" name="addr" value="' + esc(a.id) + '" data-change="addr"' + (a.id === st.manzil_id ? ' checked' : '') + '>' +
               '<div class="grow"><b>' + esc(a.nom) + '</b> · <span class="muted">' + esc(a.hudud) + '</span><div class="small">' + esc(a.matn) + '</div></div></label>';
@@ -179,17 +192,19 @@
             (q.tejaladi ? '<div class="row between save"><span>Chegirma ' + q.chegirma_foiz + '%</span><span>−' + UI.money(q.tejaladi) + '</span></div>' : '') +
             (q.keshbek_ishlatildi ? '<div class="row between save"><span>Keshbekdan</span><span>−' + UI.money(q.keshbek_ishlatildi) + '</span></div>' : '') +
             '<div class="row between total"><span>To\'lanadi</span><span>' + som(q.tolanadi) + '</span></div>' +
-            '<div class="small muted">' + UI.date(q.boshlanish) + ' — ' + UI.date(q.tugash) + ' · ' + (q.yangi_keshbek ? 'To\'lovdan keyin +' + UI.money(q.yangi_keshbek) + ' keshbek' : '') + '</div>';
+            '<div class="small muted">' + UI.date(q.boshlanish) + ' — ' + UI.date(q.tugash) + (q.yangi_keshbek ? ' · To\'lovdan keyin +' + UI.money(q.yangi_keshbek) + ' keshbek' : '') + '</div>';
         }).catch(function (e) { if (box) box.innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
       };
       var actions = {
-        ration: function (el) {
-          st.ratsion_id = el.dataset.id;
-          var pk = ration().paketlar;
-          if (!pk.some(function (p) { return p.paket_id === st.paket_id; })) st.paket_id = (pk[0] || {}).paket_id;
+        ration: function (el) { st.ratsion_id = el.value; quote(); },
+        days: function (el) { st.kunlar = Number(el.dataset.id); render(); },
+        daysInput: function (el) {
+          var n = Math.round(Number(el.value));
+          if (!n || n < 1) n = 1;
+          if (n > maxDays) n = maxDays;
+          st.kunlar = n;
           render();
         },
-        pkg: function (el) { st.paket_id = el.dataset.id; render(); },
         date: function (el) { st.boshlanish = el.dataset.id; render(); },
         addr: function (el) { st.manzil_id = el.value; },
         cb: function (el) { st.use_cashback = el.checked; quote(); },
@@ -271,22 +286,27 @@
   }
   function rejected(o) { return o.tolovlar.filter(function (p) { return p.holat === 'rad_etildi'; }).slice(-1); }
 
-  // ---------- 4. Chegirmalar ----------
+  // ---------- 4. Narxlar ----------
   function discounts() {
-    return api('discounts').then(function (c) {
-      var html = '<h1>Chegirmalar</h1><p class="muted">Uzoqroq paket — kuniga arzonroq va ko\'proq keshbek. Keshbek: to\'langan summaning ' +
-        c.keshbek.foiz + '%, ' + c.keshbek.amal_muddati_kun + ' kun amal qiladi.</p>';
-      c.ratsionlar.forEach(function (r) {
-        html += '<div class="card"><h3>' + esc(r.nom) + (r.kaloriya ? ' <span class="muted small">' + esc(r.kaloriya) + ' kkal</span>' : '') + '</h3>' +
-          (r.tavsif ? '<div class="menu-text small muted mb">' + esc(r.tavsif) + '</div>' : '') +
-          '<div class="table-wrap"><table class="tbl"><thead><tr><th>Paket</th><th>Jami</th><th>Kuniga</th><th>Tejaysiz</th><th>Keshbek</th></tr></thead><tbody>' +
-          r.paketlar.map(function (p) {
-            return '<tr><td><b>' + p.kunlar + ' kun</b>' + (p.chegirma_foiz ? ' <span class="badge st-faol">−' + p.chegirma_foiz + '%</span>' : '') + '</td>' +
-              '<td>' + UI.money(p.jami) + '</td><td>' + UI.money(p.kuniga) + '</td><td class="save">' + (p.tejaladi ? UI.money(p.tejaladi) : '—') + '</td>' +
-              '<td>' + UI.money(p.yangi_keshbek) + '</td></tr>';
-          }).join('') + '</tbody></table></div>' +
-          '<a class="btn block mt" href="#/order?ratsion=' + esc(r.id) + '">Tanlash</a></div>';
-      });
+    return Promise.all([api('discounts'), api('health', {}, { silent: true }).catch(function () { return null; })]).then(function (res) {
+      var c = res[0], hv = res[1];
+      var recId = hv && hv.tavsiya ? hv.tavsiya.ratsion_id : '';
+      var rules = discountRules(c.paketlar);
+      var html = '<h1>💲 Narxlar</h1><p class="muted">Hamma variantda menyu bir xil — farqi faqat porsiya (kaloriya) miqdorida. Variantni bosib buyurtma bering.</p>' +
+        '<div class="price-table">' +
+        '<div class="price-row head"><span>Variant</span><span>Kkal</span><span>Kunlik narx</span></div>' +
+        c.ratsionlar.map(function (r) {
+          return '<a class="price-row' + (r.id === recId ? ' rec' : '') + '" href="#/order?ratsion=' + esc(r.id) + '">' +
+            '<span><b>' + esc(r.nom) + '</b>' + (r.id === recId ? '<br><span class="badge st-faol">Sizga tavsiya</span>' : '') +
+            (r.tavsif ? '<br><span class="small muted">' + esc(r.tavsif) + '</span>' : '') + '</span>' +
+            '<span class="nowrap">' + (r.kaloriya ? esc(r.kaloriya) : '—') + '</span>' +
+            '<span class="price-val">' + UI.money(r.kunlik_narx) + '</span></a>';
+        }).join('') + '</div>' +
+        (rules.length ? '<div class="card accent mt">' + rules.map(function (t) { return '<div>🎁 <b>' + esc(t) + '</b></div>'; }).join('') + '</div>' : '') +
+        (c.keshbek.foiz ? '<div class="card mt">💰 Har bir to\'lovdan <b>' + c.keshbek.foiz + '% keshbek</b> — keyingi buyurtmada ishlatasiz (' +
+          c.keshbek.amal_muddati_kun + ' kun amal qiladi).</div>' : '') +
+        (recId ? '' : '<a class="btn ghost block mt" href="#/health">🎯 Qaysi variant menga mos?</a>') +
+        '<a class="btn block mt" href="#/order">🛒 Buyurtma berish</a>';
       UI.view(html);
     });
   }
@@ -412,15 +432,86 @@
     });
   }
 
-  // ---------- Oylik katalog ----------
+  // ---------- Menyu (katalog rasmlari) ----------
   function catalogPage() {
     return api('catalog').then(function (c) {
-      if (!c.rasmlar.length) return UI.view('<h1>Katalog</h1>' + UI.empty('📚', 'Katalog hali joylanmagan'));
-      UI.view('<h1>📚 Katalog</h1>' + (c.yangilangan ? '<p class="small muted">Yangilangan: ' + UI.date(c.yangilangan) + '</p>' : '') +
+      if (!c.rasmlar.length) return UI.view('<h1>🍽 Menyu</h1>' + UI.empty('🍽', 'Menyu hali joylanmagan'));
+      UI.view('<h1>🍽 Menyu</h1><p class="muted small">6 kunlik menyu: dushanba — 1-kun, seshanba — 2-kun ... shanba — 6-kun. Yakshanba dam olish kuni.</p>' +
+        (c.yangilangan ? '<p class="small muted">Yangilangan: ' + UI.date(c.yangilangan) + '</p>' : '') +
         c.rasmlar.map(function (x) {
-          return '<a class="catalog-img" href="#" data-click="open" data-url="' + esc(x.url) + '"><img loading="lazy" src="' + esc(x.url) + '" alt="' + esc(x.nom || 'Katalog') + '"></a>';
+          return '<a class="catalog-img" href="#" data-click="open" data-url="' + esc(x.url) + '"><img loading="lazy" src="' + esc(x.url) + '" alt="' + esc(x.nom || 'Menyu') + '"></a>';
         }).join('') + '<a class="btn block mt" href="#/order">🛒 Buyurtma berish</a>', {
         open: function (el) { UI.openLink(el.dataset.url); }
+      });
+    });
+  }
+
+  // ---------- Salomatlik: kaloriya tavsiyasi va vazn ----------
+  function weightChart(tarix) {
+    if (tarix.length < 2) return '';
+    var w = 300, h = 90, pad = 8;
+    var vals = tarix.map(function (x) { return x.vazn; });
+    var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+    if (max === min) { max += 1; min -= 1; }
+    var pts = vals.map(function (v, i) {
+      var x = pad + i * (w - 2 * pad) / (vals.length - 1);
+      var y = pad + (max - v) * (h - 2 * pad) / (max - min);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    return '<svg class="weight-chart" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none"><polyline points="' + pts + '" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>';
+  }
+
+  function healthPage(params, query) {
+    return api('health').then(function (hv) {
+      var p = hv.profil;
+      var year = new Date().getFullYear();
+      var html = '<h1>🎯 Kaloriya va vazn</h1>';
+      if (query.yangi) html += '<div class="card ok">✅ Ro\'yxatdan o\'tdingiz! Endi o\'zingizga mos kaloriyani bilib oling (ixtiyoriy).</div>';
+      if (hv.toliq && hv.tavsiya) {
+        html += '<div class="card accent"><div class="muted small">Kunlik ehtiyojingiz taxminan</div><div class="big">' + UI.money(hv.kkal) + ' kkal</div>' +
+          '<div class="mt">Sizga mos variant: <b>' + esc(hv.tavsiya.ratsion) + '</b>' + (hv.tavsiya.kaloriya ? ' (' + esc(hv.tavsiya.kaloriya) + ' kkal)' : '') +
+          ' — kuniga ' + som(hv.tavsiya.kunlik_narx) + '</div>' +
+          '<a class="btn block mt" href="#/order?ratsion=' + esc(hv.tavsiya.ratsion_id) + '">Shu variantni tanlash</a>' +
+          '<p class="hint">Tavsiya taxminiy. Boshqa variantni ham tanlashingiz mumkin.</p></div>';
+      }
+      if (p.vazn) {
+        var stt = hv.statistika;
+        html += '<div class="card' + (hv.sorash_kerak ? ' warn' : '') + '"><h3>⚖️ Vazn</h3>' +
+          (hv.sorash_kerak ? '<p>' + hv.sorash_kun + ' kun o\'tdi — bugungi vazningizni kiriting.</p>' : '') +
+          '<form class="row gap" data-submit="weight"><input name="vazn" type="number" step="0.1" min="30" max="300" inputmode="decimal" class="grow" placeholder="Bugungi vazn, kg" required>' +
+          '<button class="btn">Saqlash</button></form>' +
+          (stt ? '<div class="grid2 mt"><div><div class="muted small">Boshida (' + UI.date(stt.boshlangich_sana) + ')</div><b>' + stt.boshlangich + ' kg</b></div>' +
+            '<div><div class="muted small">Hozir (' + UI.date(stt.joriy_sana) + ')</div><b>' + stt.joriy + ' kg</b></div></div>' +
+            (stt.ozgarish ? '<div class="mt ' + (stt.ozgarish < 0 ? 'save' : '') + '"><b>' + (stt.ozgarish < 0 ? '📉 ' : '📈 ') + (stt.ozgarish > 0 ? '+' : '') + stt.ozgarish + ' kg</b></div>' : '') : '') +
+          weightChart(hv.tarix) +
+          (hv.tarix.length > 1 ? '<details class="mt"><summary class="small">Tarix</summary>' + hv.tarix.slice().reverse().map(function (x) {
+            return '<div class="row between small"><span>' + UI.date(x.sana) + '</span><b>' + x.vazn + ' kg</b></div>';
+          }).join('') + '</details>' : '') + '</div>';
+      }
+      html += '<form class="card stack" data-submit="save"><h3>' + (hv.toliq ? 'Ma\'lumotlarim' : 'Ma\'lumotlaringizni kiriting') + '</h3>' +
+        '<div class="field"><span class="field-label">Jins</span><div class="chips">' +
+        [['erkak', 'Erkak'], ['ayol', 'Ayol']].map(function (x) {
+          return '<label class="chip"><input type="radio" name="jins" value="' + x[0] + '"' + (p.jins === x[0] ? ' checked' : '') + ' required><span>' + x[1] + '</span></label>';
+        }).join('') + '</div></div>' +
+        '<div class="grid2">' +
+        UI.field('Tug\'ilgan yil', '<input name="tugilgan_yil" type="number" inputmode="numeric" min="' + (year - 100) + '" max="' + (year - 10) + '" value="' + esc(p.tugilgan_yil) + '" placeholder="1990" required>') +
+        UI.field('Bo\'y, sm', '<input name="boy" type="number" inputmode="numeric" min="100" max="230" value="' + esc(p.boy) + '" placeholder="170" required>') +
+        '</div>' +
+        UI.field('Vazn, kg', '<input name="vazn" type="number" step="0.1" inputmode="decimal" min="30" max="300" value="' + esc(p.vazn) + '" placeholder="75" required>') +
+        UI.field('Maqsadingiz', '<select name="maqsad" required>' + UI.options(hv.maqsadlar, p.maqsad, { empty: 'Tanlang' }) + '</select>') +
+        UI.field('Turmush tarzingiz', '<select name="faollik" required>' + UI.options(hv.faolliklar, p.faollik, { empty: 'Tanlang' }) + '</select>') +
+        '<button class="btn block">' + (hv.toliq ? 'Saqlash' : 'Tavsiya olish') + '</button>' +
+        '<p class="hint">Har ' + hv.sorash_kun + ' kunda vazningizni so\'raymiz — natijangizni (ozish yoki vazn olish) kuzatib borasiz. Maqsad va vaznni istalgan payt shu yerda o\'zgartirasiz.</p></form>';
+      if (query.yangi) html += '<a class="btn ghost block" href="#/order">Keyinroq — buyurtma berish</a>';
+      UI.view(html, {
+        save: function (form) {
+          var d = UI.formData(form);
+          if (String(d.vazn) === String(p.vazn)) delete d.vazn; // vazn o'zgarmagan — tarixga yozilmaydi
+          return api('healthSave', d).then(function () { UI.toast('Saqlandi'); UI.haptic('success'); UI.go('health'); });
+        },
+        weight: function (form) {
+          return api('healthSave', { vazn: UI.formData(form).vazn }).then(function () { UI.toast('Vazn saqlandi'); UI.haptic('success'); UI.reload(); });
+        }
       });
     });
   }
@@ -458,9 +549,10 @@
       { path: '', icon: '🏠', label: 'Bosh sahifa' },
       { path: 'order', icon: '🛒', label: 'Buyurtma' },
       { path: 'orders', icon: '📦', label: 'Buyurtmalarim' },
-      { path: 'cashback', icon: '💰', label: 'Keshbek' },
-      { path: 'catalog', icon: '📚', label: 'Katalog', more: true },
-      { path: 'discounts', icon: '🏷', label: 'Chegirmalar', more: true },
+      { path: 'catalog', icon: '🍽', label: 'Menyu' },
+      { path: 'discounts', icon: '💲', label: 'Narxlar', more: true },
+      { path: 'health', icon: '🎯', label: 'Kaloriya va vazn', more: true },
+      { path: 'cashback', icon: '💰', label: 'Keshbek', more: true },
       { path: 'addresses', icon: '📍', label: 'Manzillarim', more: true },
       { path: 'profile', icon: '👤', label: 'Profil', more: true }
     ]);
@@ -469,6 +561,7 @@
     UI.route('pay/:id', payPage);
     UI.route('discounts', discounts);
     UI.route('catalog', catalogPage);
+    UI.route('health', healthPage);
     UI.route('cashback', cashback);
     UI.route('orders', orders);
     UI.route('orders/:id', orderDetail);

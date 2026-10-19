@@ -57,7 +57,7 @@ const LOCK_KEY = 72017201; // barcha yozuvchi amallar uchun bitta qulf (LockServ
 const INIT_DATA_MAX_AGE_SEC = 24 * 60 * 60;
 const INSERT_CHUNK = 1000;
 
-const CLIENT_OWNED = ['Mijozlar', 'Manzillar', 'Buyurtmalar', 'Yetkazishlar', 'Tolovlar', 'KeshbekHarakat'];
+const CLIENT_OWNED = ['Mijozlar', 'Manzillar', 'Buyurtmalar', 'Yetkazishlar', 'Tolovlar', 'KeshbekHarakat', 'VaznTarix'];
 const REFERENCE = ['Foydalanuvchilar', 'Ratsionlar', 'Narxlar', 'Paketlar', 'KeshbekQoida', 'Sozlama', 'Menyu'];
 
 export function nowMs(): number {
@@ -151,6 +151,7 @@ async function loadTables(tx: Sql, scope: Scope): Promise<Record<string, Json[]>
       jobs.Yetkazishlar = tx`select * from yetkazishlar where mijoz_id = ${cid} order by tartib`;
       jobs.Tolovlar = tx`select t.* from tolovlar t join buyurtmalar b on b.id = t.buyurtma_id where b.mijoz_id = ${cid} order by t.tartib`;
       jobs.KeshbekHarakat = tx`select * from keshbek_harakat where mijoz_id = ${cid} order by tartib`;
+      jobs.VaznTarix = tx`select * from vazn_tarix where mijoz_id = ${cid} order by tartib`;
     } else {
       // ro'yxatdan o'tmagan foydalanuvchi: telefon takrorlanishini tekshirish uchun mijozlar ro'yxati kerak
       jobs.Mijozlar = tx`select * from mijozlar order by tartib`;

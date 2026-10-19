@@ -76,19 +76,45 @@ function calcQuote_(p) {
   };
 }
 
-/** Joriy versiyalar asosida taklif (sana = bugun yoki berilgan). */
-function quoteFor_(ratsionId, paketId, opts) {
+/** Bitta buyurtmada ko'pi bilan necha kun (1 yil ≈ 312 ish kuni, yakshanbasiz). */
+var MAX_ORDER_DAYS = 320;
+
+/**
+ * Buyurtma kunlari: mijoz istalgan sonni yozadi (1 kundan 1 yilgacha).
+ * Eski so'rovlar (paket_id) ham qabul qilinadi — paketning kunlar soni olinadi.
+ */
+function orderDays_(p, date) {
+  if (p && p.kunlar !== undefined && p.kunlar !== null && p.kunlar !== '') {
+    return reqInt_(Number(p.kunlar), 'Kunlar soni', 1, MAX_ORDER_DAYS);
+  }
+  if (p && p.paket_id) return packageById_(p.paket_id, date || today_()).kunlar;
+  fail('Necha kunlik buyurtma ekanini kiriting');
+}
+
+/**
+ * N kunlik buyurtma uchun paket chegirmasi: kunlar soni N dan oshmaydigan eng katta paket
+ * (masalan "10 kun — 10%" paketi bo'lsa, 10, 30, 312 kunlik buyurtmaga 10%; 9 kunlikka chegirma yo'q).
+ * Bekor qilishdagi qayta hisob (discountForDays_) bilan bir xil qoida.
+ */
+function packageForDays_(days, date) {
+  var pkgs = activePackages_(date).filter(function (p) { return p.kunlar <= days; });
+  return pkgs.length ? pkgs[pkgs.length - 1] : null;
+}
+
+/** Joriy versiyalar asosida taklif (sana = bugun yoki berilgan). kunlar — son yoki { kunlar } / { paket_id }. */
+function quoteFor_(ratsionId, kunlar, opts) {
   var date = (opts && opts.date) || today_();
   var ratsion = mustGet_('Ratsionlar', ratsionId, 'Ratsion');
   if (!ratsion.faol) fail('Bu ratsion hozir sotuvda yo\'q');
   var price = priceRow_(ratsionId, date);
   if (!price) fail('Bu ratsion uchun narx belgilanmagan');
-  var pkg = packageById_(paketId, date);
+  var days = typeof kunlar === 'object' ? orderDays_(kunlar, date) : orderDays_({ kunlar: kunlar }, date);
+  var pkg = packageForDays_(days, date);
   var rule = cashbackRule_(date);
   var q = calcQuote_({
-    kunlar: pkg.kunlar,
+    kunlar: days,
     kunlik_narx: price.kunlik_narx,
-    chegirma_foiz: pkg.chegirma_foiz,
+    chegirma_foiz: pkg ? pkg.chegirma_foiz : 0,
     keshbek_foiz: rule.foiz,
     max_ulush_foiz: rule.max_ulush_foiz,
     min_summa: rule.min_summa,
@@ -96,9 +122,17 @@ function quoteFor_(ratsionId, paketId, opts) {
     balans: (opts && opts.balans) || 0
   });
   q.ratsion_id = ratsionId;
-  q.paket_id = pkg.id;
+  q.paket_id = pkg ? pkg.id : '';
   q.keshbek_muddat_kun = rule.amal_muddati_kun;
   return q;
+}
+
+/** Ratsion kaloriyasi matnidan son: "1200" → 1200, "900–1000" → 950. */
+function kcalOf_(text) {
+  var m = String(text || '').match(/\d+/g);
+  if (!m) return 0;
+  var a = Number(m[0]), b = m.length > 1 ? Number(m[1]) : a;
+  return Math.round((a + b) / 2);
 }
 
 /** Barcha ratsion × paket kombinatsiyalari: "Chegirmalar" ekrani (6.1, 4-ekran). */
@@ -124,6 +158,7 @@ function catalog_(date) {
   }).filter(function (r) { return r.kunlik_narx > 0; });
   return {
     sana: d,
+    max_kunlar: MAX_ORDER_DAYS,
     ratsionlar: rations,
     paketlar: pkgs.map(function (p) { return pick_(p, ['id', 'nom', 'kunlar', 'chegirma_foiz']); }),
     keshbek: pick_(rule, ['foiz', 'amal_muddati_kun', 'min_summa', 'max_ulush_foiz'])

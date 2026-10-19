@@ -60,7 +60,7 @@ function priceLockMs_() {
 
 /**
  * Yangi buyurtma. source: 'mijoz' (o'zi) yoki 'admin' (mijoz nomidan qo'lda).
- * p: { ratsion_id, paket_id, boshlanish, manzil_id, use_cashback, izoh }
+ * p: { ratsion_id, kunlar (yoki eski paket_id), boshlanish, manzil_id, use_cashback, izoh }
  */
 function createOrder_(ctx, client, p, source) {
   var ratsion = mustGet_('Ratsionlar', p.ratsion_id, 'Ratsion');
@@ -72,7 +72,7 @@ function createOrder_(ctx, client, p, source) {
   if (!isWorkDay_(start, off)) fail('Bu kun dam olish kuni. Boshqa sanani tanlang');
 
   var balance = cashbackBalance_(client.id);
-  var q = quoteFor_(ratsion.id, p.paket_id, { use_cashback: !!p.use_cashback, balans: balance });
+  var q = quoteFor_(ratsion.id, p, { use_cashback: !!p.use_cashback, balans: balance });
   var dates = deliveryDates_(start, q.kunlar, off);
   var actor = actor_(ctx);
   var order = insert_('Buyurtmalar', {
@@ -122,7 +122,7 @@ function refreshStaleOrder_(order, actor) {
   var balance = cashbackBalance_(order.mijoz_id) + order.keshbek_ishlatildi; // band qilingan keshbek ham hisobga
   var q;
   try {
-    q = quoteFor_(order.ratsion_id, order.paket_id, { use_cashback: order.keshbek_ishlatildi > 0, balans: balance });
+    q = quoteFor_(order.ratsion_id, order.kunlar, { use_cashback: order.keshbek_ishlatildi > 0, balans: balance });
   } catch (e) {
     return false; // ratsion/paket sotuvdan olingan — admin hal qiladi
   }
@@ -333,9 +333,8 @@ function unpauseDay_(ctx, order, deliveryId, byStaff) {
 
 /** Paket chegirmasi: ishlatilgan kunlar sonidan oshmaydigan eng katta paket (buyurtma sanasidagi versiya). */
 function discountForDays_(days, date) {
-  var pkgs = activePackages_(date).filter(function (p) { return p.kunlar <= days; });
-  if (!pkgs.length) return 0;
-  return pkgs[pkgs.length - 1].chegirma_foiz;
+  var pkg = packageForDays_(days, date);
+  return pkg ? pkg.chegirma_foiz : 0;
 }
 
 /**

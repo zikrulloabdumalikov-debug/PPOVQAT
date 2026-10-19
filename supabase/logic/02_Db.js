@@ -15,7 +15,7 @@ var TABLE_NAMES = {
   Narxlar: 'narxlar', Paketlar: 'paketlar', KeshbekQoida: 'keshbek_qoida', Buyurtmalar: 'buyurtmalar',
   Yetkazishlar: 'yetkazishlar', Tolovlar: 'tolovlar', KeshbekHarakat: 'keshbek_harakat',
   XarajatTurkum: 'xarajat_turkum', Xarajatlar: 'xarajatlar', Xodimlar: 'xodimlar', Oyliklar: 'oyliklar',
-  Menyu: 'menyu', Audit: 'audit', Sozlama: 'sozlama'
+  Menyu: 'menyu', VaznTarix: 'vazn_tarix', Audit: 'audit', Sozlama: 'sozlama'
 };
 
 var DB_CACHE = {};

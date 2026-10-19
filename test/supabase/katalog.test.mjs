@@ -1,9 +1,9 @@
-/** Doimiy menyu, kaloriya oralig'i va oylik katalog. */
+/** Kaloriya oralig'i, 6 kunlik menyu va menyu (katalog) rasmlari. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeEnv, PNG } from './helpers.mjs';
 
-test('Ratsion: kaloriya oralig\'i va doimiy menyu mijozga ko\'rinadi', async () => {
+test('Ratsion: kaloriya oralig\'i va tavsif mijozga ko\'rinadi; menyu kuni hafta kuniga qarab', async () => {
   const env = await makeEnv();
   const menyu = 'Nonushta: suli bo\'tqasi\nTushlik: tovuq, grechka\nKechki: baliq';
   await env.ok(env.IDS.partner, 'rationSave', {
@@ -14,10 +14,8 @@ test('Ratsion: kaloriya oralig\'i va doimiy menyu mijozga ko\'rinadi', async () 
   assert.equal(cat.ratsionlar[0].kaloriya, '900–1000');
   assert.equal(cat.ratsionlar[0].tavsif, menyu);
   const home = await env.ok(env.IDS.clientA, 'home');
-  assert.equal(home.menyu.bugun.length, 0, 'kunlik menyu kiritilmagan');
-  assert.equal(home.doimiy_menyu.length, 1);
-  assert.equal(home.doimiy_menyu[0].taomlar, menyu);
-  assert.equal(home.doimiy_menyu[0].kaloriya, '900–1000');
+  // 2026-10-13 seshanba → menyuning 2-kuni, ertaga 3-kun
+  assert.deepEqual(home.menyu_kuni, { bugun: 2, ertaga: 3 });
   // juda uzun kaloriya matni rad etiladi
   const r = await env.api(env.IDS.partner, 'rationSave', { id: env.ration.id, nom: 'X', kaloriya: 'x'.repeat(40) });
   assert.equal(r.ok, false);

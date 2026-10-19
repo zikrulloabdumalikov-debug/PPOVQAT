@@ -25,7 +25,9 @@ var SCHEMA = {
   Mijozlar: [
     ['id', 's'], ['tg_id', 's'], ['ism', 's'], ['telefon', 's'], ['manba', 's'],
     ['royxatdan_sana', 'd'], ['holat', 's'], ['izoh', 's'], ['til', 's'],
-    ['rozilik_vaqt', 't'], ['telefon_sorov', 's'], ['kim_yaratdi', 's'], ['faol', 'b']
+    ['rozilik_vaqt', 't'], ['telefon_sorov', 's'], ['kim_yaratdi', 's'], ['faol', 'b'],
+    ['jins', 's'], ['tugilgan_yil', 'n'], ['boy', 'n'], ['vazn', 'f'], ['maqsad', 's'], ['faollik', 's'],
+    ['vazn_soralgan', 'd']
   ],
   Manzillar: [
     ['id', 's'], ['mijoz_id', 's'], ['nom', 's'], ['lat', 'g'], ['lng', 'g'], ['matn', 's'],
@@ -85,6 +87,9 @@ var SCHEMA = {
   Menyu: [
     ['id', 's'], ['sana', 'd'], ['ratsion_id', 's'], ['taomlar', 's'], ['kaloriya', 'n'], ['faol', 'b']
   ],
+  VaznTarix: [
+    ['id', 's'], ['mijoz_id', 's'], ['sana', 'd'], ['vazn', 'f'], ['kim', 's'], ['yaratilgan', 't']
+  ],
   Audit: [
     ['id', 's'], ['vaqt', 't'], ['kim', 's'], ['amal', 's'], ['varaq', 's'], ['yozuv_id', 's'],
     ['eski', 's'], ['yangi', 's'], ['muhim', 's']
@@ -126,7 +131,8 @@ var DEFAULT_SETTINGS = {
   backup_papka_id: '',
   arxiv_papka_id: '',
   chek_papka_id: '',
-  katalog: '[]',                         // oylik katalog rasmlari: [{"yol":"...","nom":"..."}]
+  katalog: '[]',                         // menyu (katalog) rasmlari: [{"yol":"...","nom":"..."}]
+  vazn_sorash_kun: '15',                 // mijozdan vaznini necha kunda bir so'rash (statistika uchun)
   rozilik_matni: "Ro'yxatdan o'tish orqali ism, telefon raqami va manzilingiz buyurtmani yetkazish va xizmat ko'rsatish uchun qayta ishlanishiga rozilik bildirasiz. Istalgan vaqtda ma'lumotlaringizni o'chirishni so'rashingiz mumkin."
 };
 

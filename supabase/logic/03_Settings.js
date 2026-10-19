@@ -52,7 +52,7 @@ var SETTING_VALIDATORS = {
   kesish_vaqti: 'hm', ertalabki_xabar_vaqti: 'hm', kun_oxiri_vaqti: 'hm', eslatma_vaqti: 'hm',
   pauza_foiz: 'pct', narx_kafolat_soat: 'int', mijoz_uxlash_kun: 'int', mijoz_ketgan_kun: 'int',
   katta_xarajat: 'int', max_summa: 'int', min_marja_foiz: 'pct', rate_limit_daqiqa: 'int',
-  paket_eslatma_kun: 'int', keshbek_eslatma_kun: 'int',
+  paket_eslatma_kun: 'int', keshbek_eslatma_kun: 'int', vazn_sorash_kun: 'int',
   bayramlar: 'jsonDates', hududlar: 'jsonStrings', kuryer_hudud: 'jsonObj', sherik_ulushlari: 'jsonShares',
   reja: 'jsonPairs', dam_kunlari: 'weekdays', bizning_xato_qoida: 'faultRule',
   ishga_tushish_sana: 'dateOpt', katalog: 'jsonList'
