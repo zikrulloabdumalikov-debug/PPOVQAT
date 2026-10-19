@@ -328,3 +328,19 @@ details summary { cursor: pointer; color: var(--muted); }
 
 /* ---------- Dev login ---------- */
 .dev-users { display: grid; gap: 8px; }
+
+/* ---------- Yo'riqnoma ---------- */
+.help-sec { padding: 0; }
+.help-sec summary { cursor: pointer; padding: 14px 16px; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 10px; color: var(--text); }
+.help-sec summary::-webkit-details-marker { display: none; }
+.help-sec summary::after { content: "›"; margin-left: auto; color: var(--muted); transition: transform .15s; }
+.help-sec[open] summary::after { transform: rotate(90deg); }
+.help-ico { font-size: 20px; }
+.help-body { padding: 0 16px 16px; }
+.help-body h4 { margin: 14px 0 6px; font-size: .98rem; }
+.help-steps, .help-list { margin: 6px 0 10px; padding-left: 22px; }
+.help-steps li, .help-list li { margin-bottom: 6px; }
+.help-tip { background: var(--brand-soft); border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: .9rem; }
+.help-pre { background: var(--bg); border-radius: 10px; padding: 10px 12px; white-space: pre-wrap; font-size: .88rem; margin: 6px 0; }
+.help-body .tbl { margin: 8px 0; }
+.help-body code { background: var(--bg); padding: 1px 6px; border-radius: 6px; }

@@ -42,7 +42,8 @@
   function today() {
     return api('adminToday').then(function (d) {
       var t = d;
-      var html = '<h1>Bugun <span class="muted small">' + UI.date(t.sana, true) + '</span></h1>';
+      var html = '<div class="row between wrap"><h1>Bugun <span class="muted small">' + UI.date(t.sana, true) + '</span></h1>' +
+        '<a class="btn small ghost" href="#/help">📖 Yo\'riqnoma</a></div>';
       if (t.belgilanmagan.length) {
         html += '<div class="card danger-card"><h3>🔴 Belgilanmagan yetkazishlar: ' + t.belgilanmagan.length + '</h3><div class="list">' +
           t.belgilanmagan.map(function (c, i) {

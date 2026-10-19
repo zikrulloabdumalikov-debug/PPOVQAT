@@ -610,9 +610,11 @@
         { path: 'audit', icon: '🕓', label: 'Audit', more: true }
       ]);
     }
+    nav.push({ path: 'help', icon: '📖', label: 'Yo\'riqnoma', more: true });
     UI.setNav(nav, partner ? 'Admin panel' : 'Operator');
     A.routes1();
     if (partner) A.routes2();
+    if (A.helpRoute) A.helpRoute();
     UI.start();
   };
 })();
