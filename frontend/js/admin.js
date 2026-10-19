@@ -44,6 +44,16 @@
       var t = d;
       var html = '<div class="row between wrap"><h1>Bugun <span class="muted small">' + UI.date(t.sana, true) + '</span></h1>' +
         '<a class="btn small ghost" href="#/help">📖 Yo\'riqnoma</a></div>';
+      var sz = t.sozlash;
+      if (sz && (!sz.ratsion || !sz.paket || !sz.katalog || !sz.karta)) {
+        var todo = [];
+        if (!sz.ratsion) todo.push('Kaloriya variantlari va narxlar kiritilmagan — mijoz narxni ko\'rmaydi, tavsiya ishlamaydi. ' + (A.me.rol === 'sherik' ? '<a href="#/pricing">Narx va paketlar</a>' : '(sherik kiritadi)'));
+        if (!sz.paket) todo.push('Chegirma (masalan 10 kun — 10%) kiritilmagan. ' + (A.me.rol === 'sherik' ? '<a href="#/pricing">Narx va paketlar</a>' : ''));
+        if (!sz.katalog) todo.push('Menyu rasmi joylanmagan — mijoz menyuni ko\'rmaydi. <a href="#/menu-edit">Menyu</a>');
+        if (!sz.karta) todo.push('Karta raqami kiritilmagan — mijoz to\'lay olmaydi. ' + (A.me.rol === 'sherik' ? '<a href="#/settings">Sozlamalar</a>' : ''));
+        html += '<div class="card warn"><h3>⚠️ Ilova hali to\'liq sozlanmagan</h3><ul class="help-list">' +
+          todo.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul></div>';
+      }
       if (t.belgilanmagan.length) {
         html += '<div class="card danger-card"><h3>🔴 Belgilanmagan yetkazishlar: ' + t.belgilanmagan.length + '</h3><div class="list">' +
           t.belgilanmagan.map(function (c, i) {

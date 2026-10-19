@@ -292,6 +292,7 @@
       var c = res[0], hv = res[1];
       var recId = hv && hv.tavsiya ? hv.tavsiya.ratsion_id : '';
       var rules = discountRules(c.paketlar);
+      if (!c.ratsionlar.length) return UI.view('<h1>💲 Narxlar</h1>' + UI.empty('💲', 'Narxlar hali kiritilmagan. Tez orada qo\'shiladi.'));
       var html = '<h1>💲 Narxlar</h1><p class="muted">Hamma variantda menyu bir xil — farqi faqat porsiya (kaloriya) miqdorida. Variantni bosib buyurtma bering.</p>' +
         '<div class="price-table">' +
         '<div class="price-row head"><span>Variant</span><span>Kkal</span><span>Kunlik narx</span></div>' +
@@ -467,6 +468,10 @@
       var year = new Date().getFullYear();
       var html = '<h1>🎯 Kaloriya va vazn</h1>';
       if (query.yangi) html += '<div class="card ok">✅ Ro\'yxatdan o\'tdingiz! Endi o\'zingizga mos kaloriyani bilib oling (ixtiyoriy).</div>';
+      if (hv.toliq && !hv.tavsiya) {
+        html += '<div class="card accent"><div class="muted small">Kunlik ehtiyojingiz taxminan</div><div class="big">' + UI.money(hv.kkal) + ' kkal</div>' +
+          '<p class="small muted">Kaloriya variantlari hali kiritilmagan, shuning uchun mos variantni ko\'rsata olmadik. Tez orada qo\'shiladi.</p></div>';
+      }
       if (hv.toliq && hv.tavsiya) {
         html += '<div class="card accent"><div class="muted small">Kunlik ehtiyojingiz taxminan</div><div class="big">' + UI.money(hv.kkal) + ' kkal</div>' +
           '<div class="mt">Sizga mos variant: <b>' + esc(hv.tavsiya.ratsion) + '</b>' + (hv.tavsiya.kaloriya ? ' (' + esc(hv.tavsiya.kaloriya) + ' kkal)' : '') +

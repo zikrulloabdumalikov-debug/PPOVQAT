@@ -132,3 +132,18 @@ test('Vazn tarixi: bir kunda bitta yozuv, har 15 kunda bot so\'raydi, statistika
   const card = await env.ok(env.IDS.operator, 'clientGet', { id: st.items[0].mijoz_id });
   assert.equal(card.salomatlik.tarix.length, 2);
 });
+
+test('Sozlanmagan ilova: admin ogohlantiriladi, tavsiya bo\'lmasa ham kaloriya ko\'rinadi', async () => {
+  const env = await makeEnv();
+  let t = await env.ok(env.IDS.partner, 'adminToday');
+  assert.equal(t.sozlash.ratsion, 1);
+  assert.equal(t.sozlash.katalog, 0);
+  // yagona ratsion sotuvdan olinsa — tavsiya yo'q, lekin kaloriya hisoblanadi
+  await env.ok(env.IDS.partner, 'rationSave', { id: env.ration.id, nom: env.ration.nom, kaloriya: '1200', faol: false, tannarx_ovqat: 44800, tannarx_qadoq_yetkazish: 22000 });
+  t = await env.ok(env.IDS.partner, 'adminToday');
+  assert.equal(t.sozlash.ratsion, 0);
+  const h = await env.ok(env.IDS.clientA, 'healthSave', { jins: 'erkak', tugilgan_yil: 2004, boy: 182, vazn: 65, maqsad: 'vazn_olish', faollik: 'ofis' });
+  assert.equal(h.toliq, true);
+  assert.equal(h.kkal, 2320);
+  assert.equal(h.tavsiya, null);
+});

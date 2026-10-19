@@ -34,6 +34,12 @@ function adminToday_(ctx) {
   });
   var res = {
     sana: t,
+    sozlash: {
+      ratsion: all_('Ratsionlar').filter(function (r) { return r.faol && priceRow_(r.id, t); }).length,
+      paket: activePackages_(t).length,
+      katalog: catalogList_().length,
+      karta: !!setting_('karta_raqami')
+    },
     tolov_kutilmoqda: {
       buyurtmalar: pendingOrders.length,
       cheklar: pendingPays.length,
